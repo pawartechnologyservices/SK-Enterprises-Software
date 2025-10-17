@@ -42,15 +42,56 @@ const Leave = () => {
                 Apply for Leave
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-md w-[95vw] max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Apply for Leave</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Employee Information */}
+                <div className="space-y-3 p-3 bg-muted/30 rounded-lg">
+                  <div className="space-y-2">
+                    <Label htmlFor="employeeName" className="text-sm">Employee Name</Label>
+                    <Input 
+                      id="employeeName" 
+                      value="John Doe" 
+                      readOnly 
+                      className="bg-background h-9"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="employeeId" className="text-sm">Employee ID</Label>
+                    <Input 
+                      id="employeeId" 
+                      value="EMP001" 
+                      readOnly 
+                      className="bg-background h-9"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="department" className="text-sm">Department</Label>
+                    <Input 
+                      id="department" 
+                      value="Operations" 
+                      readOnly 
+                      className="bg-background h-9"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="contactNumber" className="text-sm">Contact Number</Label>
+                    <Input 
+                      id="contactNumber" 
+                      value="+1 234 567 8900" 
+                      readOnly 
+                      className="bg-background h-9"
+                    />
+                  </div>
+                </div>
+
+                {/* Leave Details */}
                 <div className="space-y-2">
-                  <Label htmlFor="type">Leave Type</Label>
+                  <Label htmlFor="type" className="text-sm">Leave Type</Label>
                   <Select required>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-9">
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -62,19 +103,24 @@ const Leave = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="from">From Date</Label>
-                    <Input id="from" type="date" required />
+                    <Label htmlFor="from" className="text-sm">From Date</Label>
+                    <Input id="from" type="date" required className="h-9" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="to">To Date</Label>
-                    <Input id="to" type="date" required />
+                    <Label htmlFor="to" className="text-sm">To Date</Label>
+                    <Input id="to" type="date" required className="h-9" />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="reason">Reason</Label>
-                  <Textarea id="reason" placeholder="Enter reason for leave" required />
+                  <Label htmlFor="reason" className="text-sm">Reason</Label>
+                  <Textarea 
+                    id="reason" 
+                    placeholder="Enter reason for leave" 
+                    required 
+                    className="min-h-[80px] resize-none"
+                  />
                 </div>
-                <Button type="submit" className="w-full">Submit to Admin</Button>
+                <Button type="submit" className="w-full h-9">Submit to Admin</Button>
               </form>
             </DialogContent>
           </Dialog>
