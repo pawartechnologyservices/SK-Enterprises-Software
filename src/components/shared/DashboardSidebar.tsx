@@ -19,10 +19,12 @@ import {
   DollarSign,
   Bell,
   Menu,
-  X
+  X,
+  Workflow
 } from "lucide-react";
 import { useRole, UserRole } from "@/context/RoleContext";
 import { motion } from "framer-motion";
+import { workerData } from "worker_threads";
 
 const getSidebarItems = (role: UserRole) => {
   const baseItems = [
@@ -37,6 +39,7 @@ const getSidebarItems = (role: UserRole) => {
         { name: "HRMS", icon: Users, path: "hrms" },
         { name: "CRM", icon: Building2, path: "crm" },
         { name: "ERP", icon: ClipboardList, path: "erp" },
+         { name: "workissue", icon: ClipboardList, path: "workissue" },
         { name: "Billing & Finance", icon: DollarSign, path: "billing" },
         { name: "Operations", icon: ClipboardList, path: "operations" },
         { name: "Reports", icon: BarChart3, path: "reports" },
@@ -65,6 +68,7 @@ const getSidebarItems = (role: UserRole) => {
         { name: "Team & Tasks", icon: ClipboardList, path: "tasks" },
         { name: "Reports", icon: BarChart3, path: "reports" },
         { name: "Leave", icon: Calendar, path: "leave" },
+         { name: "Attendance", icon: Calendar, path: "managerattendance" },
         { name: "Notifications", icon: Bell, path: "notifications" },
         { name: "Settings", icon: Settings, path: "settings" },
       ];
@@ -74,6 +78,7 @@ const getSidebarItems = (role: UserRole) => {
         ...baseItems,
         { name: "Profile", icon: UserCog, path: "profile" },
         { name: "My Tasks", icon: ClipboardList, path: "tasks" },
+         { name: "Work Query", icon:Workflow, path: "query" },
         { name: "Employees", icon: Users, path: "employees" },
         { name: "Attendance", icon: Calendar, path: "attendance" },
         { name: "Leave", icon: Calendar, path: "leave" },

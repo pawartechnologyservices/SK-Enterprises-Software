@@ -32,21 +32,17 @@ const Signup = () => {
       return;
     }
 
-    if (selectedRole !== "superadmin" && selectedRole !== "admin") {
-      toast.error("Only Super Admin and Admin can sign up directly");
+    if (selectedRole !== "superadmin") {
+      toast.error("Only Super Admin can sign up directly");
       return;
     }
 
     try {
       await signup(name, email, password, selectedRole);
-      toast.success("Account created successfully!");
+      toast.success("Super Admin account created successfully!");
       
-      // Navigate based on role
-      if (selectedRole === "superadmin") {
-        navigate("/superadmin/dashboard");
-      } else {
-        navigate("/admin/dashboard");
-      }
+      // Navigate to superadmin dashboard
+      navigate("/superadmin/dashboard");
     } catch (error) {
       toast.error("Signup failed. Please try again.");
     }
@@ -65,8 +61,8 @@ const Signup = () => {
             <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
               <Shield className="h-8 w-8 text-primary" />
             </div>
-            <CardTitle className="text-3xl font-bold">Create Account</CardTitle>
-            <CardDescription>Super Admin & Admin registration</CardDescription>
+            <CardTitle className="text-3xl font-bold">Create Super Admin Account</CardTitle>
+            <CardDescription>Super Admin registration portal</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -78,9 +74,11 @@ const Signup = () => {
                   </SelectTrigger>
                   <SelectContent className="bg-popover z-50">
                     <SelectItem value="superadmin">Super Admin</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Only Super Admin role is available for direct registration
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -127,6 +125,7 @@ const Signup = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     className="pl-10"
                     required
+                    minLength={6}
                   />
                 </div>
               </div>
@@ -143,12 +142,13 @@ const Signup = () => {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="pl-10"
                     required
+                    minLength={6}
                   />
                 </div>
               </div>
 
               <Button type="submit" className="w-full">
-                Create Account
+                Create Super Admin Account
               </Button>
 
               <div className="text-center text-sm text-muted-foreground">
@@ -156,6 +156,12 @@ const Signup = () => {
                 <a href="/login" className="text-primary hover:underline font-medium">
                   Sign in
                 </a>
+              </div>
+
+              <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                <p className="text-xs text-muted-foreground text-center">
+                  <strong>Note:</strong> Other roles (Admin, Manager, Supervisor, Employee) must be created by Super Admin through the user management system.
+                </p>
               </div>
             </form>
           </CardContent>

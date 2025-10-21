@@ -2,18 +2,34 @@ import { useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
 import { DashboardHeader } from "@/components/shared/DashboardHeader";
 import { StatCard } from "@/components/shared/StatCard";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Shield, ClipboardList, CheckCircle2, Clock, Users, FileText, Plus, TrendingUp, Calendar, Eye } from "lucide-react";
+import { 
+  Shield, 
+  ClipboardList, 
+  CheckCircle2, 
+  Clock, 
+  Users, 
+  FileText, 
+  Plus, 
+  TrendingUp, 
+  Calendar, 
+  Eye,
+  LogIn,
+  LogOut,
+  Coffee,
+  Timer,
+  Ban
+} from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 
 // Types
 interface Activity {
   id: number;
-  type: "task_completed" | "task_assigned" | "report_generated" | "team_update";
+  type: "task_completed" | "task_assigned" | "report_generated" | "team_update" | "checkin" | "checkout" | "break";
   title: string;
   user: string;
   time: string;
@@ -27,6 +43,18 @@ interface QuickAction {
   icon: any;
   action: () => void;
   color: string;
+}
+
+interface AttendanceStatus {
+  isCheckedIn: boolean;
+  isOnBreak: boolean;
+  checkInTime: string | null;
+  checkOutTime: string | null;
+  breakStartTime: string | null;
+  breakEndTime: string | null;
+  totalHours: number;
+  breakTime: number;
+  lastCheckInDate: string | null;
 }
 
 const ManagerDashboard = () => {
@@ -45,28 +73,203 @@ const ManagerDashboard = () => {
   const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Attendance state
+  const [attendance, setAttendance] = useState<AttendanceStatus>({
+    isCheckedIn: false,
+    isOnBreak: false,
+    checkInTime: null,
+    checkOutTime: null,
+    breakStartTime: null,
+    breakEndTime: null,
+    totalHours: 0,
+    breakTime: 0,
+    lastCheckInDate: null
+  });
+
+  const [hasCheckedInToday, setHasCheckedInToday] = useState(false);
+
   // Fetch live data on component mount
   useEffect(() => {
     fetchLiveData();
+    loadAttendanceStatus();
     const interval = setInterval(fetchLiveData, 30000); // Refresh every 30 seconds
     return () => clearInterval(interval);
   }, []);
+
+  // Check if user has already checked in today
+  useEffect(() => {
+    checkIfAlreadyCheckedInToday();
+  }, [attendance.lastCheckInDate]);
+
+  // Load attendance status from localStorage or API
+  const loadAttendanceStatus = async () => {
+    try {
+      const savedAttendance = localStorage.getItem('managerAttendance');
+      if (savedAttendance) {
+        const attendanceData = JSON.parse(savedAttendance);
+        setAttendance(attendanceData);
+        checkIfAlreadyCheckedInToday(attendanceData.lastCheckInDate);
+      }
+    } catch (error) {
+      console.error('Error loading attendance status:', error);
+    }
+  };
+
+  // Check if user has already checked in today
+  const checkIfAlreadyCheckedInToday = (lastCheckInDate?: string | null) => {
+    const today = new Date().toDateString();
+    const checkInDate = lastCheckInDate ? new Date(lastCheckInDate).toDateString() : null;
+    setHasCheckedInToday(checkInDate === today && !attendance.isCheckedIn);
+  };
+
+  // Save attendance status
+  const saveAttendanceStatus = (newAttendance: AttendanceStatus) => {
+    setAttendance(newAttendance);
+    localStorage.setItem('managerAttendance', JSON.stringify(newAttendance));
+    checkIfAlreadyCheckedInToday(newAttendance.lastCheckInDate);
+  };
+
+  // Reset attendance for new day
+  const resetAttendanceForNewDay = () => {
+    const newAttendance = {
+      isCheckedIn: false,
+      isOnBreak: false,
+      checkInTime: null,
+      checkOutTime: null,
+      breakStartTime: null,
+      breakEndTime: null,
+      totalHours: 0,
+      breakTime: 0,
+      lastCheckInDate: attendance.lastCheckInDate
+    };
+    saveAttendanceStatus(newAttendance);
+    setHasCheckedInToday(true);
+    toast.success("Attendance reset for new day!");
+  };
+
+  // Attendance handlers
+  const handleCheckIn = () => {
+    const now = new Date().toISOString();
+    const today = new Date().toDateString();
+    
+    const newAttendance = {
+      ...attendance,
+      isCheckedIn: true,
+      checkInTime: now,
+      checkOutTime: null,
+      lastCheckInDate: today
+    };
+    saveAttendanceStatus(newAttendance);
+    setHasCheckedInToday(true);
+    
+    // Add activity
+    addActivity('checkin', `Checked in at ${formatTimeForDisplay(now)}`);
+    toast.success("Successfully checked in!");
+  };
+
+  const handleCheckOut = () => {
+    const now = new Date().toISOString();
+    const totalHours = calculateTotalHours(attendance.checkInTime, now);
+    
+    const newAttendance = {
+      ...attendance,
+      isCheckedIn: false,
+      isOnBreak: false,
+      checkOutTime: now,
+      totalHours
+    };
+    saveAttendanceStatus(newAttendance);
+    
+    // Add activity
+    addActivity('checkout', `Checked out at ${formatTimeForDisplay(now)} - Total: ${totalHours.toFixed(2)}h`);
+    toast.success(`Checked out! Total hours: ${totalHours.toFixed(2)}`);
+  };
+
+  const handleBreakIn = () => {
+    const now = new Date().toISOString();
+    const newAttendance = {
+      ...attendance,
+      isOnBreak: true,
+      breakStartTime: now
+    };
+    saveAttendanceStatus(newAttendance);
+    
+    // Add activity
+    addActivity('break', `Started break at ${formatTimeForDisplay(now)}`);
+    toast.info("Break started. Enjoy your break!");
+  };
+
+  const handleBreakOut = () => {
+    const now = new Date().toISOString();
+    const breakTime = calculateBreakTime(attendance.breakStartTime, now);
+    const totalBreakTime = attendance.breakTime + breakTime;
+    
+    const newAttendance = {
+      ...attendance,
+      isOnBreak: false,
+      breakEndTime: now,
+      breakTime: totalBreakTime
+    };
+    saveAttendanceStatus(newAttendance);
+    
+    // Add activity
+    addActivity('break', `Ended break at ${formatTimeForDisplay(now)} - Duration: ${breakTime.toFixed(2)}h`);
+    toast.success(`Break ended. Duration: ${breakTime.toFixed(2)} hours`);
+  };
+
+  // Helper functions for time calculations
+  const calculateTotalHours = (start: string | null, end: string | null): number => {
+    if (!start || !end) return 0;
+    const startTime = new Date(start).getTime();
+    const endTime = new Date(end).getTime();
+    return (endTime - startTime) / (1000 * 60 * 60);
+  };
+
+  const calculateBreakTime = (start: string | null, end: string | null): number => {
+    if (!start || !end) return 0;
+    const startTime = new Date(start).getTime();
+    const endTime = new Date(end).getTime();
+    return (endTime - startTime) / (1000 * 60 * 60);
+  };
+
+  const formatTimeForDisplay = (timestamp: string): string => {
+    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const formatDateForDisplay = (timestamp: string): string => {
+    return new Date(timestamp).toLocaleDateString([], { 
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const addActivity = (type: string, message: string) => {
+    const newActivity: Activity = {
+      id: Date.now(),
+      type: type as any,
+      title: message,
+      user: 'You',
+      time: 'Just now',
+      avatar: 'M'
+    };
+    setRecentActivities(prev => [newActivity, ...prev.slice(0, 4)]);
+  };
 
   // Simulate fetching live data
   const fetchLiveData = async () => {
     setIsLoading(true);
     
-    // Simulate API call delay
     setTimeout(() => {
-      // Generate realistic live data
       const currentTime = new Date();
       const liveStats = {
-        totalSupervisors: Math.floor(Math.random() * 5) + 6, // 6-10
-        activeProjects: Math.floor(Math.random() * 4) + 10, // 10-13
-        pendingTasks: Math.floor(Math.random() * 8) + 3, // 3-10
-        completedTasks: Math.floor(Math.random() * 20) + 40, // 40-59
-        teamMembers: Math.floor(Math.random() * 10) + 20, // 20-29
-        productivityScore: Math.floor(Math.random() * 20) + 75 // 75-94
+        totalSupervisors: Math.floor(Math.random() * 5) + 6,
+        activeProjects: Math.floor(Math.random() * 4) + 10,
+        pendingTasks: Math.floor(Math.random() * 8) + 3,
+        completedTasks: Math.floor(Math.random() * 20) + 40,
+        teamMembers: Math.floor(Math.random() * 10) + 20,
+        productivityScore: Math.floor(Math.random() * 20) + 75
       };
 
       const liveActivities: Activity[] = [
@@ -101,19 +304,11 @@ const ManagerDashboard = () => {
           user: "System",
           time: "1 hour ago",
           avatar: "S"
-        },
-        {
-          id: 5,
-          type: "task_completed",
-          title: "Bug fixes deployed to production",
-          user: ["David Kim", "Emma Garcia"][Math.floor(Math.random() * 2)],
-          time: "2 hours ago",
-          avatar: "DK"
         }
       ];
 
       setStats(liveStats);
-      setRecentActivities(liveActivities);
+      setRecentActivities(prev => [...liveActivities, ...prev.filter(a => a.type !== 'checkin' && a.type !== 'checkout' && a.type !== 'break').slice(0, 1)]);
       setIsLoading(false);
     }, 1000);
   };
@@ -161,7 +356,6 @@ const ManagerDashboard = () => {
         label: "View Tasks",
         onClick: () => {
           toast.info("Navigating to tasks management");
-          // In real app: navigate('/tasks')
         }
       }
     });
@@ -174,7 +368,6 @@ const ManagerDashboard = () => {
         label: "Details",
         onClick: () => {
           toast.success("Opening team details dashboard");
-          // In real app: navigate('/team')
         }
       }
     });
@@ -190,7 +383,6 @@ const ManagerDashboard = () => {
           label: "Download",
           onClick: () => {
             toast.info("Downloading report...");
-            // In real app: download report file
           }
         }
       });
@@ -203,7 +395,6 @@ const ManagerDashboard = () => {
         label: "Full Analytics",
         onClick: () => {
           toast.success("Opening detailed analytics dashboard");
-          // In real app: navigate('/analytics')
         }
       }
     });
@@ -248,6 +439,33 @@ const ManagerDashboard = () => {
           action: {
             label: "View Team",
             onClick: () => toast.success("Opening team management dashboard")
+          }
+        });
+      },
+      checkin: () => {
+        toast.success("✅ Check-in Recorded", {
+          description: activity.title,
+          action: {
+            label: "View Attendance",
+            onClick: () => toast.info("Opening attendance records")
+          }
+        });
+      },
+      checkout: () => {
+        toast.success("🚪 Check-out Recorded", {
+          description: activity.title,
+          action: {
+            label: "View Summary",
+            onClick: () => toast.info("Opening daily summary")
+          }
+        });
+      },
+      break: () => {
+        toast.info("☕ Break Time", {
+          description: activity.title,
+          action: {
+            label: "View Schedule",
+            onClick: () => toast.info("Opening break schedule")
           }
         });
       }
@@ -334,7 +552,10 @@ const ManagerDashboard = () => {
       task_completed: <CheckCircle2 className="h-4 w-4 text-green-500" />,
       task_assigned: <ClipboardList className="h-4 w-4 text-blue-500" />,
       report_generated: <FileText className="h-4 w-4 text-purple-500" />,
-      team_update: <Users className="h-4 w-4 text-orange-500" />
+      team_update: <Users className="h-4 w-4 text-orange-500" />,
+      checkin: <LogIn className="h-4 w-4 text-green-500" />,
+      checkout: <LogOut className="h-4 w-4 text-blue-500" />,
+      break: <Coffee className="h-4 w-4 text-purple-500" />
     };
     return icons[type as keyof typeof icons];
   };
@@ -345,7 +566,10 @@ const ManagerDashboard = () => {
       task_completed: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800",
       task_assigned: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800",
       report_generated: "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800",
-      team_update: "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800"
+      team_update: "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800",
+      checkin: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800",
+      checkout: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800",
+      break: "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800"
     };
     return colors[type as keyof typeof colors];
   };
@@ -356,7 +580,10 @@ const ManagerDashboard = () => {
       task_completed: "Completed",
       task_assigned: "Assigned",
       report_generated: "Report",
-      team_update: "Team Update"
+      team_update: "Team Update",
+      checkin: "Check In",
+      checkout: "Check Out",
+      break: "Break Time"
     };
     return labels[type as keyof typeof labels];
   };
@@ -370,6 +597,133 @@ const ManagerDashboard = () => {
       />
 
       <div className="p-6 space-y-6">
+        {/* Attendance Controls */}
+        <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Timer className="h-5 w-5 text-blue-600" />
+              Attendance Control
+            </CardTitle>
+            <CardDescription>
+              Manage your work hours and breaks - One check-in allowed per day
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {/* Daily Check-in Status */}
+            {hasCheckedInToday && !attendance.isCheckedIn && (
+              <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-300">
+                  <Ban className="h-4 w-4" />
+                  <span className="text-sm font-medium">Already Checked In Today</span>
+                </div>
+                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                  You have already checked in today. Check-in is allowed only once per day.
+                </p>
+                {attendance.lastCheckInDate && (
+                  <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                    Last check-in: {formatDateForDisplay(attendance.lastCheckInDate)}
+                  </p>
+                )}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2 text-xs"
+                  onClick={resetAttendanceForNewDay}
+                >
+                  Reset for New Day
+                </Button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Check In/Out */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Work Status</span>
+                  <Badge className={attendance.isCheckedIn ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                    {attendance.isCheckedIn ? 'Checked In' : 'Checked Out'}
+                  </Badge>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleCheckIn}
+                    disabled={attendance.isCheckedIn || hasCheckedInToday}
+                    className="flex-1 flex items-center gap-2"
+                    variant={(attendance.isCheckedIn || hasCheckedInToday) ? "outline" : "default"}
+                  >
+                    <LogIn className="h-4 w-4" />
+                    {hasCheckedInToday && !attendance.isCheckedIn ? 'Already Checked In' : 'Check In'}
+                  </Button>
+                  <Button
+                    onClick={handleCheckOut}
+                    disabled={!attendance.isCheckedIn}
+                    className="flex-1 flex items-center gap-2"
+                    variant={!attendance.isCheckedIn ? "outline" : "default"}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Check Out
+                  </Button>
+                </div>
+                {attendance.checkInTime && (
+                  <p className="text-xs text-gray-500">
+                    Checked in: {formatTimeForDisplay(attendance.checkInTime)}
+                    {attendance.lastCheckInDate && ` on ${formatDateForDisplay(attendance.lastCheckInDate)}`}
+                  </p>
+                )}
+              </div>
+
+              {/* Break In/Out */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Break Status</span>
+                  <Badge className={attendance.isOnBreak ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'}>
+                    {attendance.isOnBreak ? 'On Break' : 'Active'}
+                  </Badge>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleBreakIn}
+                    disabled={!attendance.isCheckedIn || attendance.isOnBreak}
+                    className="flex-1 flex items-center gap-2"
+                    variant={(!attendance.isCheckedIn || attendance.isOnBreak) ? "outline" : "default"}
+                  >
+                    <Coffee className="h-4 w-4" />
+                    Break In
+                  </Button>
+                  <Button
+                    onClick={handleBreakOut}
+                    disabled={!attendance.isOnBreak}
+                    className="flex-1 flex items-center gap-2"
+                    variant={!attendance.isOnBreak ? "outline" : "default"}
+                  >
+                    <Timer className="h-4 w-4" />
+                    Break Out
+                  </Button>
+                </div>
+                {attendance.breakStartTime && attendance.isOnBreak && (
+                  <p className="text-xs text-gray-500">
+                    Break started: {formatTimeForDisplay(attendance.breakStartTime)}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Summary */}
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-500">Total Hours:</span>
+                  <p className="font-medium">{attendance.totalHours.toFixed(2)}h</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Break Time:</span>
+                  <p className="font-medium">{attendance.breakTime.toFixed(2)}h</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
@@ -458,7 +812,6 @@ const ManagerDashboard = () => {
             <CardContent>
               <div className="space-y-4">
                 {isLoading ? (
-                  // Loading skeleton
                   Array.from({ length: 4 }).map((_, index) => (
                     <div key={index} className="flex items-start gap-4 p-3">
                       <div className="h-8 w-8 bg-muted rounded-full animate-pulse" />

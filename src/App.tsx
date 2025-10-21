@@ -76,6 +76,9 @@ import ApplyLeave from "./pages/employee/ApplyLeave";
 import EmployeeAttendance from "./pages/employee/EmployeeAttendance";
 
 import NotFound from "./pages/NotFound";
+import ManagerAttendance from "./pages/manager/ManagerAttendance";
+import WorkQuery from "./pages/supervisor/WorkQuery";
+import SuperAdminWorkIssues from "./pages/superadmin/SuperAdminWorkIssues";
 
 const queryClient = new QueryClient();
 
@@ -108,6 +111,7 @@ const App = () => (
               <Route path="employees" element={<Employees />} />
               <Route path="hrms" element={<HRMS />} />
               <Route path="documents" element={<Documents />} />
+              <Route path="workissue" element={<SuperAdminWorkIssues />} />
               <Route path="operations" element={<Operations />} />
               <Route path="notifications" element={<Notifications />} />
               <Route path="crm" element={<CRM />} />
@@ -159,6 +163,7 @@ const App = () => (
               <Route path="tasks" element={<ManagerTasks />} />
               <Route path="reports" element={<ManagerReports />} />
               <Route path="leave" element={<ManagerLeave />} />
+              <Route path="managerattendance" element={<ManagerAttendance />}/>
               <Route path="notifications" element={<ManagerNotifications />} />
               <Route path="settings" element={<ManagerSettings />} />
             </Route>
@@ -175,6 +180,7 @@ const App = () => (
               <Route path="dashboard" element={<SupervisorDashboard />} />
               <Route path="profile" element={<SupervisorProfile />} />
               <Route path="tasks" element={<Tasks />} />
+              <Route path="query" element={<WorkQuery />} />
               <Route path="employees" element={<SupervisorEmployees />} />
               <Route path="attendance" element={<Attendance />} />
               <Route path="leave" element={<SupervisorLeave />} />

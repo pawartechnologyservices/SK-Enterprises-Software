@@ -19,7 +19,11 @@ import {
   Plus,
   Download,
   Search,
-  RefreshCw
+  RefreshCw,
+  LogIn,
+  LogOut,
+  Coffee,
+  Timer
 } from "lucide-react";
 
 // Define types for the data
@@ -59,9 +63,110 @@ interface Task {
   progress: number;
 }
 
+interface AttendanceStatus {
+  isCheckedIn: boolean;
+  isOnBreak: boolean;
+  checkInTime: string | null;
+  checkOutTime: string | null;
+  breakStartTime: string | null;
+  breakEndTime: string | null;
+  totalHours: number;
+  breakTime: number;
+}
+
 interface OutletContext {
   onMenuClick: () => void;
 }
+
+// Mock data generators
+const generateMockStats = (): DashboardStats => ({
+  totalEmployees: 24,
+  assignedTasks: 45,
+  completedTasks: 32,
+  pendingReports: 8,
+  attendanceRate: 92,
+  overtimeHours: 12,
+  productivity: 88,
+  pendingRequests: 5
+});
+
+const generateMockActivities = (): Activity[] => [
+  {
+    id: '1',
+    type: 'task',
+    message: 'Completed monthly sales report',
+    employee: 'John Doe',
+    priority: 'high',
+    timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString() // 30 minutes ago
+  },
+  {
+    id: '2',
+    type: 'approval',
+    message: 'Requested leave approval',
+    employee: 'Sarah Smith',
+    priority: 'medium',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString() // 2 hours ago
+  },
+  {
+    id: '3',
+    type: 'completion',
+    message: 'Finished project documentation',
+    employee: 'Mike Johnson',
+    priority: 'low',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString() // 5 hours ago
+  },
+  {
+    id: '4',
+    type: 'checkin',
+    message: 'Checked in for the day',
+    employee: 'You',
+    priority: 'medium',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString() // 8 hours ago
+  }
+];
+
+const generateMockTeam = (): TeamMember[] => [
+  { id: '1', name: 'John Doe', role: 'Senior Developer', status: 'active' },
+  { id: '2', name: 'Sarah Smith', role: 'QA Engineer', status: 'active' },
+  { id: '3', name: 'Mike Johnson', role: 'Frontend Developer', status: 'remote' },
+  { id: '4', name: 'Emily Brown', role: 'Backend Developer', status: 'on leave' },
+  { id: '5', name: 'David Wilson', role: 'DevOps Engineer', status: 'active' }
+];
+
+const generateMockTasks = (): Task[] => [
+  {
+    id: '1',
+    title: 'Update project documentation',
+    dueDate: '2024-01-15',
+    assignedTo: 'John Doe',
+    priority: 'high',
+    progress: 75
+  },
+  {
+    id: '2',
+    title: 'Fix login authentication bug',
+    dueDate: '2024-01-12',
+    assignedTo: 'Sarah Smith',
+    priority: 'high',
+    progress: 90
+  },
+  {
+    id: '3',
+    title: 'Design new dashboard layout',
+    dueDate: '2024-01-20',
+    assignedTo: 'Mike Johnson',
+    priority: 'medium',
+    progress: 40
+  },
+  {
+    id: '4',
+    title: 'Performance optimization',
+    dueDate: '2024-01-18',
+    assignedTo: 'Emily Brown',
+    priority: 'low',
+    progress: 20
+  }
+];
 
 const SupervisorDashboard = () => {
   const { onMenuClick } = useOutletContext<OutletContext>();
@@ -83,41 +188,171 @@ const SupervisorDashboard = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  
+  // Attendance state with proper initial values
+  const [attendance, setAttendance] = useState<AttendanceStatus>({
+    isCheckedIn: false,
+    isOnBreak: false,
+    checkInTime: null,
+    checkOutTime: null,
+    breakStartTime: null,
+    breakEndTime: null,
+    totalHours: 0,
+    breakTime: 0
+  });
 
   // Fetch all data
   useEffect(() => {
     loadData();
+    loadAttendanceStatus();
   }, []);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      // Replace with your API calls
-      const [statsRes, activitiesRes, teamRes, tasksRes] = await Promise.all([
-        fetch('/api/dashboard/stats'),
-        fetch('/api/activities/recent'),
-        fetch('/api/team/members'),
-        fetch('/api/tasks/upcoming')
-      ]);
-
-      setStats((await statsRes.json()) || {
-        totalEmployees: 0,
-        assignedTasks: 0,
-        completedTasks: 0,
-        pendingReports: 0,
-        attendanceRate: 0,
-        overtimeHours: 0,
-        productivity: 0,
-        pendingRequests: 0
-      });
-      setActivities((await activitiesRes.json()) || []);
-      setTeam((await teamRes.json()) || []);
-      setTasks((await tasksRes.json()) || []);
+      // Use mock data instead of API calls
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API delay
+      
+      setStats(generateMockStats());
+      setActivities(generateMockActivities());
+      setTeam(generateMockTeam());
+      setTasks(generateMockTasks());
+      
     } catch (error) {
       console.error('Error loading data:', error);
+      // Fallback to mock data even if there's an error
+      setStats(generateMockStats());
+      setActivities(generateMockActivities());
+      setTeam(generateMockTeam());
+      setTasks(generateMockTasks());
     } finally {
       setLoading(false);
     }
+  };
+
+  // Load attendance status from localStorage
+  const loadAttendanceStatus = async () => {
+    try {
+      // Try to load from localStorage first
+      const savedAttendance = localStorage.getItem('supervisorAttendance');
+      if (savedAttendance) {
+        const parsedAttendance = JSON.parse(savedAttendance);
+        // Ensure numeric values
+        setAttendance({
+          ...parsedAttendance,
+          totalHours: Number(parsedAttendance.totalHours) || 0,
+          breakTime: Number(parsedAttendance.breakTime) || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error loading attendance status:', error);
+    }
+  };
+
+  // Save attendance status
+  const saveAttendanceStatus = (newAttendance: AttendanceStatus) => {
+    // Ensure numeric values before saving
+    const sanitizedAttendance = {
+      ...newAttendance,
+      totalHours: Number(newAttendance.totalHours) || 0,
+      breakTime: Number(newAttendance.breakTime) || 0
+    };
+    
+    setAttendance(sanitizedAttendance);
+    localStorage.setItem('supervisorAttendance', JSON.stringify(sanitizedAttendance));
+  };
+
+  // Attendance handlers
+  const handleCheckIn = () => {
+    const now = new Date().toISOString();
+    const newAttendance = {
+      ...attendance,
+      isCheckedIn: true,
+      checkInTime: now,
+      checkOutTime: null
+    };
+    saveAttendanceStatus(newAttendance);
+    
+    // Add activity
+    addActivity('checkin', `Checked in at ${formatTimeForDisplay(now)}`);
+  };
+
+  const handleCheckOut = () => {
+    const now = new Date().toISOString();
+    const totalHours = calculateTotalHours(attendance.checkInTime, now);
+    
+    const newAttendance = {
+      ...attendance,
+      isCheckedIn: false,
+      isOnBreak: false,
+      checkOutTime: now,
+      totalHours: totalHours
+    };
+    saveAttendanceStatus(newAttendance);
+    
+    // Add activity
+    addActivity('checkout', `Checked out at ${formatTimeForDisplay(now)} - Total: ${totalHours.toFixed(2)}h`);
+  };
+
+  const handleBreakIn = () => {
+    const now = new Date().toISOString();
+    const newAttendance = {
+      ...attendance,
+      isOnBreak: true,
+      breakStartTime: now
+    };
+    saveAttendanceStatus(newAttendance);
+    
+    // Add activity
+    addActivity('break', `Started break at ${formatTimeForDisplay(now)}`);
+  };
+
+  const handleBreakOut = () => {
+    const now = new Date().toISOString();
+    const breakTime = calculateBreakTime(attendance.breakStartTime, now);
+    const totalBreakTime = (Number(attendance.breakTime) || 0) + breakTime;
+    
+    const newAttendance = {
+      ...attendance,
+      isOnBreak: false,
+      breakEndTime: now,
+      breakTime: totalBreakTime
+    };
+    saveAttendanceStatus(newAttendance);
+    
+    // Add activity
+    addActivity('break', `Ended break at ${formatTimeForDisplay(now)} - Duration: ${breakTime.toFixed(2)}h`);
+  };
+
+  // Helper functions for time calculations
+  const calculateTotalHours = (start: string | null, end: string | null): number => {
+    if (!start || !end) return 0;
+    const startTime = new Date(start).getTime();
+    const endTime = new Date(end).getTime();
+    return (endTime - startTime) / (1000 * 60 * 60); // Convert to hours
+  };
+
+  const calculateBreakTime = (start: string | null, end: string | null): number => {
+    if (!start || !end) return 0;
+    const startTime = new Date(start).getTime();
+    const endTime = new Date(end).getTime();
+    return (endTime - startTime) / (1000 * 60 * 60); // Convert to hours
+  };
+
+  const formatTimeForDisplay = (timestamp: string): string => {
+    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const addActivity = (type: string, message: string) => {
+    const newActivity: Activity = {
+      id: Date.now().toString(),
+      type,
+      message,
+      employee: 'You',
+      priority: 'medium',
+      timestamp: new Date().toISOString()
+    };
+    setActivities(prev => [newActivity, ...prev.slice(0, 9)]); // Keep only 10 most recent
   };
 
   // Filter data based on search
@@ -137,14 +372,15 @@ const SupervisorDashboard = () => {
     const actions: { [key: string]: (id?: string) => void } = {
       assignTask: () => alert('Opening task assignment...'),
       generateReport: () => alert('Generating report...'),
-      approveRequests: () => window.location.href = '/approvals',
-      scheduleMeeting: () => window.location.href = '/meetings/schedule',
-      performanceReview: () => window.location.href = '/performance/reviews',
+      approveRequests: () => window.location.href = '/supervisor/approvals',
+      scheduleMeeting: () => window.location.href = '/supervisor/meetings/schedule',
+      performanceReview: () => window.location.href = '/supervisor/performance/reviews',
       exportData: () => alert('Exporting data...'),
-      viewAllActivities: () => window.location.href = '/activities',
-      manageEmployees: () => window.location.href = '/employees',
-      viewTask: (id?: string) => window.location.href = `/tasks/${id}`,
-      viewEmployee: (id?: string) => window.location.href = `/employees/${id}`
+      viewAllActivities: () => window.location.href = '/supervisor/activities',
+      manageEmployees: () => window.location.href = '/supervisor/employees',
+      viewTask: (id?: string) => window.location.href = `/supervisor/tasks/${id}`,
+      viewEmployee: (id?: string) => window.location.href = `/supervisor/employees/${id}`,
+      viewAttendance: () => window.location.href = '/supervisor/attendance'
     };
     
     if (actions[action]) {
@@ -168,7 +404,10 @@ const SupervisorDashboard = () => {
       icon: {
         task: 'bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
         approval: 'bg-orange-100 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400',
-        completion: 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400'
+        completion: 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400',
+        checkin: 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400',
+        checkout: 'bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
+        break: 'bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400'
       },
       progress: {
         high: 'bg-red-600 dark:bg-red-500',
@@ -194,12 +433,17 @@ const SupervisorDashboard = () => {
     return 'Just now';
   };
 
+  // Safe number formatting for display
+  const formatNumber = (value: number): string => {
+    return Number(value).toFixed(2);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <RefreshCw className="h-12 w-12 text-blue-600 dark:text-blue-400 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading Dashboard...</p>
         </div>
       </div>
     );
@@ -223,6 +467,106 @@ const SupervisorDashboard = () => {
           </Button>
         </div>
 
+        {/* Attendance Controls */}
+        <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Timer className="h-5 w-5 text-blue-600" />
+              Attendance Control
+            </CardTitle>
+            <CardDescription>
+              Manage your work hours and breaks
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Check In/Out */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Work Status</span>
+                  <Badge className={attendance.isCheckedIn ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                    {attendance.isCheckedIn ? 'Checked In' : 'Checked Out'}
+                  </Badge>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleCheckIn}
+                    disabled={attendance.isCheckedIn}
+                    className="flex-1 flex items-center gap-2"
+                    variant={attendance.isCheckedIn ? "outline" : "default"}
+                  >
+                    <LogIn className="h-4 w-4" />
+                    Check In
+                  </Button>
+                  <Button
+                    onClick={handleCheckOut}
+                    disabled={!attendance.isCheckedIn}
+                    className="flex-1 flex items-center gap-2"
+                    variant={!attendance.isCheckedIn ? "outline" : "default"}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Check Out
+                  </Button>
+                </div>
+                {attendance.checkInTime && (
+                  <p className="text-xs text-gray-500">
+                    Checked in: {formatTimeForDisplay(attendance.checkInTime)}
+                  </p>
+                )}
+              </div>
+
+              {/* Break In/Out */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Break Status</span>
+                  <Badge className={attendance.isOnBreak ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'}>
+                    {attendance.isOnBreak ? 'On Break' : 'Active'}
+                  </Badge>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleBreakIn}
+                    disabled={!attendance.isCheckedIn || attendance.isOnBreak}
+                    className="flex-1 flex items-center gap-2"
+                    variant={(!attendance.isCheckedIn || attendance.isOnBreak) ? "outline" : "default"}
+                  >
+                    <Coffee className="h-4 w-4" />
+                    Break In
+                  </Button>
+                  <Button
+                    onClick={handleBreakOut}
+                    disabled={!attendance.isOnBreak}
+                    className="flex-1 flex items-center gap-2"
+                    variant={!attendance.isOnBreak ? "outline" : "default"}
+                  >
+                    <Timer className="h-4 w-4" />
+                    Break Out
+                  </Button>
+                </div>
+                {attendance.breakStartTime && attendance.isOnBreak && (
+                  <p className="text-xs text-gray-500">
+                    Break started: {formatTimeForDisplay(attendance.breakStartTime)}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Summary */}
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-500">Total Hours:</span>
+                  <p className="font-medium">{formatNumber(attendance.totalHours)}h</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Break Time:</span>
+                  <p className="font-medium">{formatNumber(attendance.breakTime)}h</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard title="Total Employees" value={stats.totalEmployees || 0} icon={Users} />
@@ -240,7 +584,7 @@ const SupervisorDashboard = () => {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <input
             type="text"
-            placeholder="Search..."
+            placeholder="Search activities, tasks..."
             className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -271,6 +615,9 @@ const SupervisorDashboard = () => {
                       {activity.type === 'task' && <ClipboardList className="h-4 w-4" />}
                       {activity.type === 'approval' && <FileText className="h-4 w-4" />}
                       {activity.type === 'completion' && <CheckCircle2 className="h-4 w-4" />}
+                      {activity.type === 'checkin' && <LogIn className="h-4 w-4" />}
+                      {activity.type === 'checkout' && <LogOut className="h-4 w-4" />}
+                      {activity.type === 'break' && <Coffee className="h-4 w-4" />}
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium">{activity.message}</p>
@@ -400,6 +747,10 @@ const SupervisorDashboard = () => {
                 <Button variant="outline" className="w-full justify-start" onClick={() => handleAction('scheduleMeeting')}>
                   <MessageSquare className="h-4 w-4 mr-2" />
                   Schedule Meeting
+                </Button>
+                <Button variant="outline" className="w-full justify-start" onClick={() => handleAction('viewAttendance')}>
+                  <Timer className="h-4 w-4 mr-2" />
+                  View Attendance
                 </Button>
                 <Button variant="outline" className="w-full justify-start" onClick={() => handleAction('exportData')}>
                   <Download className="h-4 w-4 mr-2" />

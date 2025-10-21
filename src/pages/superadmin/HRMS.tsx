@@ -9,11 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle, XCircle, Search, Download, Upload, Plus, Edit, Trash2, User, Calendar, FileText, Eye } from "lucide-react";
+import { CheckCircle, XCircle, Search, Download, Upload, Plus, Edit, Trash2, User, Calendar, FileText, Eye, Sheet } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-
 
 // Types
 interface Employee {
@@ -597,6 +596,162 @@ const AssignTaskDialog = ({ open, onOpenChange, onSubmit }: {
   </Dialog>
 );
 
+// Excel Import/Export Functions
+const exportToExcel = (data: any[], filename: string) => {
+  // Convert data to CSV format
+  const headers = Object.keys(data[0]).join(',');
+  const rows = data.map(row => 
+    Object.values(row).map(value => 
+      typeof value === 'string' && value.includes(',') ? `"${value}"` : value
+    ).join(',')
+  );
+  const csv = [headers, ...rows].join('\n');
+  
+  // Create and download file
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${filename}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+  
+  toast.success(`${filename} exported successfully!`);
+};
+
+const importFromExcel = (file: File, setEmployees: React.Dispatch<React.SetStateAction<Employee[]>>) => {
+  const reader = new FileReader();
+  
+  reader.onload = (e) => {
+    try {
+      const content = e.target?.result as string;
+      const lines = content.split('\n');
+      const headers = lines[0].split(',').map(h => h.trim());
+      
+      const newEmployees: Employee[] = [];
+      
+      for (let i = 1; i < lines.length; i++) {
+        if (lines[i].trim() === '') continue;
+        
+        const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+        const employee: Employee = {
+          id: initialEmployees.length + i,
+          employeeId: `EMP${String(initialEmployees.length + i).padStart(3, '0')}`,
+          name: values[headers.indexOf('name')] || '',
+          email: values[headers.indexOf('email')] || '',
+          phone: values[headers.indexOf('phone')] || generateIndianPhone(),
+          aadharNumber: values[headers.indexOf('aadharNumber')] || generateAadhar(),
+          department: values[headers.indexOf('department')] || departments[Math.floor(Math.random() * departments.length)],
+          position: values[headers.indexOf('position')] || '',
+          joinDate: values[headers.indexOf('joinDate')] || new Date().toISOString().split('T')[0],
+          status: 'active',
+          salary: Number(values[headers.indexOf('salary')]) || 30000,
+          uan: `1012345678${String(initialEmployees.length + i).padStart(2, '0')}`,
+          esicNumber: `2312345678${String(initialEmployees.length + i).padStart(2, '0')}`,
+          documents: []
+        };
+        
+        newEmployees.push(employee);
+      }
+      
+      setEmployees(prev => [...prev, ...newEmployees]);
+      toast.success(`Successfully imported ${newEmployees.length} employees!`);
+    } catch (error) {
+      toast.error('Error importing Excel file. Please check the format.');
+      console.error('Import error:', error);
+    }
+  };
+  
+  reader.onerror = () => {
+    toast.error('Error reading file');
+  };
+  
+  reader.readAsText(file);
+};
+
+// Excel Import Dialog Component
+const ExcelImportDialog = ({ 
+  open, 
+  onOpenChange, 
+  onImport 
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+  onImport: (file: File) => void;
+}) => {
+  const [file, setFile] = useState<File | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+    }
+  };
+
+  const handleImport = () => {
+    if (file) {
+      onImport(file);
+      setFile(null);
+      onOpenChange(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Import Employees from Excel</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="border-2 border-dashed rounded-lg p-6 text-center">
+            <Sheet className="mx-auto h-8 w-8 text-muted-foreground" />
+            <p className="mt-2 text-sm text-muted-foreground">
+              Upload Excel/CSV file with employee data
+            </p>
+            <Input
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              onChange={handleFileChange}
+              className="hidden"
+              id="excel-upload"
+            />
+            <Label htmlFor="excel-upload">
+              <Button variant="outline" className="mt-4" asChild>
+                <span>Choose File</span>
+              </Button>
+            </Label>
+            {file && (
+              <p className="mt-2 text-sm text-green-600">
+                Selected: {file.name}
+              </p>
+            )}
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Expected CSV Format:</Label>
+            <div className="text-sm text-muted-foreground space-y-1">
+              <div>• Columns: name, email, phone, aadharNumber, department, position, salary</div>
+              <div>• First row should be headers</div>
+              <div>• File should be UTF-8 encoded</div>
+            </div>
+          </div>
+          
+          <Button 
+            onClick={handleImport} 
+            disabled={!file}
+            className="w-full"
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Import Employees
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 // Salary Slip Card Component
 const SalarySlipCard = ({ slip }: { slip: SalarySlip }) => {
   const totalEarnings = Object.values(slip.earnings).reduce((sum, amount) => sum + amount, 0);
@@ -804,6 +959,7 @@ const HRMS = () => {
   const [activeTab, setActiveTab] = useState("employees");
   const [searchTerm, setSearchTerm] = useState("");
   const [salaryDialogOpen, setSalaryDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [selectedEmployeeForSalary, setSelectedEmployeeForSalary] = useState<string>("");
   const [selectedMonth, setSelectedMonth] = useState(
     new Date().toISOString().slice(0, 7) // Current month in YYYY-MM format
@@ -900,6 +1056,37 @@ const HRMS = () => {
   const handleDeleteEmployee = (id: number) => {
     setEmployees(employees.filter(emp => emp.id !== id));
     toast.success("Employee deleted successfully!");
+  };
+
+  // Excel Import/Export Functions
+  const handleExportEmployees = () => {
+    const exportData = employees.map(emp => ({
+      employeeId: emp.employeeId,
+      name: emp.name,
+      email: emp.email,
+      phone: emp.phone,
+      aadharNumber: emp.aadharNumber,
+      department: emp.department,
+      position: emp.position,
+      joinDate: emp.joinDate,
+      status: emp.status,
+      salary: emp.salary,
+      uan: emp.uan,
+      esicNumber: emp.esicNumber
+    }));
+    exportToExcel(exportData, 'employees_data');
+  };
+
+  const handleImportEmployees = (file: File) => {
+    importFromExcel(file, setEmployees);
+  };
+
+  const handleExportPayroll = () => {
+    exportToExcel(payroll, 'payroll_data');
+  };
+
+  const handleExportAttendance = () => {
+    exportToExcel(attendance, 'attendance_data');
   };
 
   // Leave Management Functions
@@ -1305,11 +1492,30 @@ const HRMS = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <Button onClick={() => setActiveTab("onboarding")}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Employee
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setImportDialogOpen(true)}
+                >
+                  <Sheet className="mr-2 h-4 w-4" />
+                  Import Excel
+                </Button>
+                <Button variant="outline" onClick={handleExportEmployees}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export Excel
+                </Button>
+                <Button onClick={() => setActiveTab("onboarding")}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Employee
+                </Button>
+              </div>
             </div>
+
+            <ExcelImportDialog 
+              open={importDialogOpen}
+              onOpenChange={setImportDialogOpen}
+              onImport={handleImportEmployees}
+            />
 
             <div className="grid gap-4 md:grid-cols-4">
               <StatCard title="Total Employees" value={employees.length} />
@@ -1592,6 +1798,14 @@ const HRMS = () => {
 
           {/* Attendance Tab */}
           <TabsContent value="attendance" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Attendance Management</h2>
+              <Button variant="outline" onClick={handleExportAttendance}>
+                <Download className="mr-2 h-4 w-4" />
+                Export Attendance
+              </Button>
+            </div>
+
             <div className="grid gap-4 md:grid-cols-4">
               <StatCard title="Present Today" value={attendanceSummary.present} className="text-primary" />
               <StatCard title="Absent Today" value={attendanceSummary.absent} className="text-destructive" />
@@ -1832,6 +2046,13 @@ const HRMS = () => {
 
           {/* Payroll Tab */}
           <TabsContent value="payroll">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">Payroll Management</h2>
+              <Button variant="outline" onClick={handleExportPayroll}>
+                <Download className="mr-2 h-4 w-4" />
+                Export Payroll
+              </Button>
+            </div>
             <PayrollSection />
           </TabsContent>
 
@@ -1888,10 +2109,16 @@ const HRMS = () => {
           <TabsContent value="reports" className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">HR Reports</h2>
-              <Button>
-                <Download className="mr-2 h-4 w-4" />
-                Export All Reports
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleExportEmployees}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export Employees
+                </Button>
+                <Button>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export All Reports
+                </Button>
+              </div>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
