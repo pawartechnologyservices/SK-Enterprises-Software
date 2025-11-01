@@ -1410,13 +1410,13 @@ const Operations = () => {
         <StatsCards />
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-6">
+          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5">
             <TabsTrigger value="tasks">Tasks</TabsTrigger>
             <TabsTrigger value="sites">Sites</TabsTrigger>
             <TabsTrigger value="roster">Roster</TabsTrigger>
             <TabsTrigger value="services">Services</TabsTrigger>
             <TabsTrigger value="alerts">Alerts & Issues</TabsTrigger>
-            <TabsTrigger value="calculator">Price Calculator</TabsTrigger>
+            {/* <TabsTrigger value="calculator">Price Calculator</TabsTrigger> */}
           </TabsList>
 
           <TabsContent value="tasks">

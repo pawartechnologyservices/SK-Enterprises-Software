@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle, XCircle, Search, Download, Upload, Plus, Edit, Trash2, User, Calendar, FileText, Eye, Sheet } from "lucide-react";
+import { CheckCircle, XCircle, Search, Download, Upload, Plus, Edit, Trash2, User, Calendar, FileText, Eye, Sheet, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -113,6 +113,9 @@ interface SalaryStructure {
   professionalTax: number;
   tds: number;
   otherDeductions: number;
+  workingDays: number;
+  paidDays: number;
+  lopDays: number;
 }
 
 interface SalarySlip {
@@ -146,41 +149,177 @@ interface SalarySlip {
   generatedDate: string;
 }
 
-// Indian Dummy Data
-const indianNames = {
-  male: ["Rajesh Kumar", "Amit Sharma", "Sanjay Patel", "Vikram Singh", "Arun Reddy", "Mohan Das", "Suresh Iyer", "Prakash Joshi"],
-  female: ["Priya Sharma", "Anjali Singh", "Sunita Reddy", "Kavita Patel", "Meera Iyer", "Laxmi Kumar", "Sonia Das", "Neha Joshi"]
+// Pagination Component
+interface PaginationProps {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  itemsPerPage: number;
+  onPageChange: (page: number) => void;
+  onItemsPerPageChange: (itemsPerPage: number) => void;
+}
+
+const Pagination = ({
+  currentPage,
+  totalPages,
+  totalItems,
+  itemsPerPage,
+  onPageChange,
+  onItemsPerPageChange,
+}: PaginationProps) => {
+  const pageNumbers = [];
+  const maxVisiblePages = 5;
+
+  let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+  let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+  if (endPage - startPage + 1 < maxVisiblePages) {
+    startPage = Math.max(1, endPage - maxVisiblePages + 1);
+  }
+
+  for (let i = startPage; i <= endPage; i++) {
+    pageNumbers.push(i);
+  }
+
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <span>Show</span>
+        <Select
+          value={itemsPerPage.toString()}
+          onValueChange={(value) => onItemsPerPageChange(Number(value))}
+        >
+          <SelectTrigger className="w-20">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="5">5</SelectItem>
+            <SelectItem value="10">10</SelectItem>
+            <SelectItem value="20">20</SelectItem>
+            <SelectItem value="50">50</SelectItem>
+          </SelectContent>
+        </Select>
+        <span>entries per page</span>
+      </div>
+
+      <div className="flex items-center gap-2 text-sm">
+        <span>
+          Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} entries
+        </span>
+      </div>
+
+      <div className="flex items-center gap-1">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(1)}
+          disabled={currentPage === 1}
+        >
+          <ChevronsLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+
+        {startPage > 1 && (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(1)}
+            >
+              1
+            </Button>
+            {startPage > 2 && <span className="px-2">...</span>}
+          </>
+        )}
+
+        {pageNumbers.map((page) => (
+          <Button
+            key={page}
+            variant={currentPage === page ? "default" : "outline"}
+            size="sm"
+            onClick={() => onPageChange(page)}
+          >
+            {page}
+          </Button>
+        ))}
+
+        {endPage < totalPages && (
+          <>
+            {endPage < totalPages - 1 && <span className="px-2">...</span>}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(totalPages)}
+            >
+              {totalPages}
+            </Button>
+          </>
+        )}
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(totalPages)}
+          disabled={currentPage === totalPages}
+        >
+          <ChevronsRight className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
 };
 
-const departments = ["IT", "HR", "Finance", "Operations", "Marketing", "Sales", "Production", "Quality Control"];
+// Updated Departments
+const departments = [
+  "Housekeeping Management", 
+  "Security Management", 
+  "Parking Management", 
+  "Waste Management", 
+  "STP Tank Cleaning", 
+  "Consumables Management"
+];
+
 const positions = {
-  IT: ["Software Engineer", "Senior Developer", "Team Lead", "Project Manager"],
-  HR: ["HR Executive", "HR Manager", "Recruiter", "Training Manager"],
-  Finance: ["Accountant", "Financial Analyst", "Finance Manager"],
-  Operations: ["Operations Executive", "Operations Manager", "Logistics Head"],
-  Marketing: ["Marketing Executive", "Digital Marketer", "Marketing Manager"],
-  Sales: ["Sales Executive", "Sales Manager", "Business Development"],
-  Production: ["Production Worker", "Production Supervisor", "Production Manager"],
-  "Quality Control": ["QC Inspector", "QC Manager"]
+  "Housekeeping Management": ["Housekeeping Supervisor", "Cleaner", "Floor Manager", "Sanitation Officer"],
+  "Security Management": ["Security Guard", "Security Supervisor", "Security Manager", "CCTV Operator"],
+  "Parking Management": ["Parking Attendant", "Parking Supervisor", "Valet", "Parking Manager"],
+  "Waste Management": ["Waste Collector", "Waste Supervisor", "Recycling Officer", "Waste Manager"],
+  "STP Tank Cleaning": ["STP Operator", "Cleaning Technician", "STP Supervisor", "Maintenance Manager"],
+  "Consumables Management": ["Store Keeper", "Inventory Manager", "Supply Coordinator", "Procurement Officer"]
 };
 
 const generateIndianPhone = () => `9${Math.floor(100000000 + Math.random() * 900000000)}`;
 const generateAadhar = () => `${Math.floor(1000 + Math.random() * 9000)} ${Math.floor(1000 + Math.random() * 9000)} ${Math.floor(1000 + Math.random() * 9000)}`;
 
-// Initial Data with Indian Names
+// Updated Initial Data with Provided Names
 const initialEmployees: Employee[] = [
   {
     id: 1,
     employeeId: "EMP001",
-    name: "Rajesh Kumar",
-    email: "rajesh.kumar@company.com",
+    name: "PRAVIN GAIKWAD",
+    email: "pravin.gaikwad@company.com",
     phone: "9876543210",
     aadharNumber: "1234 5678 9012",
-    department: "IT",
-    position: "Senior Developer",
+    department: "Housekeeping Management",
+    position: "Housekeeping Supervisor",
     joinDate: "2023-01-15",
     status: "active",
-    salary: 85000,
+    salary: 25000,
     uan: "101234567890",
     esicNumber: "231234567890",
     documents: [
@@ -205,15 +344,15 @@ const initialEmployees: Employee[] = [
   {
     id: 2,
     employeeId: "EMP002",
-    name: "Priya Sharma",
-    email: "priya.sharma@company.com",
+    name: "KAILASH WAGHMARE",
+    email: "kailash.waghmare@company.com",
     phone: "9876543211",
     aadharNumber: "2345 6789 0123",
-    department: "HR",
-    position: "HR Manager",
+    department: "Security Management",
+    position: "Security Supervisor",
     joinDate: "2022-03-10",
     status: "active",
-    salary: 75000,
+    salary: 22000,
     uan: "101234567891",
     esicNumber: "231234567891",
     documents: [
@@ -230,15 +369,15 @@ const initialEmployees: Employee[] = [
   {
     id: 3,
     employeeId: "EMP003",
-    name: "Amit Patel",
-    email: "amit.patel@company.com",
+    name: "KALPNA RATHOD",
+    email: "kalpna.rathod@company.com",
     phone: "9876543212",
     aadharNumber: "3456 7890 1234",
-    department: "Finance",
-    position: "Finance Manager",
+    department: "Housekeeping Management",
+    position: "Cleaner",
     joinDate: "2021-06-20",
     status: "active",
-    salary: 90000,
+    salary: 18000,
     uan: "101234567892",
     esicNumber: "231234567892",
     documents: [
@@ -251,13 +390,288 @@ const initialEmployees: Employee[] = [
         status: "expired"
       }
     ]
+  },
+  {
+    id: 4,
+    employeeId: "EMP004",
+    name: "GUNDU GHORGANE",
+    email: "gundu.ghorgane@company.com",
+    phone: "9876543213",
+    aadharNumber: "4567 8901 2345",
+    department: "Parking Management",
+    position: "Parking Supervisor",
+    joinDate: "2023-03-15",
+    status: "active",
+    salary: 20000,
+    uan: "101234567893",
+    esicNumber: "231234567893",
+    documents: [
+      {
+        id: 1,
+        type: "Aadhar Card",
+        name: "aadhar_card.pdf",
+        uploadDate: "2023-03-15",
+        expiryDate: "2030-03-15",
+        status: "valid"
+      }
+    ]
+  },
+  {
+    id: 5,
+    employeeId: "EMP005",
+    name: "GOVIND PILEWAD",
+    email: "govind.pilewad@company.com",
+    phone: "9876543214",
+    aadharNumber: "5678 9012 3456",
+    department: "Waste Management",
+    position: "Waste Supervisor",
+    joinDate: "2022-08-01",
+    status: "active",
+    salary: 21000,
+    uan: "101234567894",
+    esicNumber: "231234567894",
+    documents: [
+      {
+        id: 1,
+        type: "Aadhar Card",
+        name: "aadhar_card.pdf",
+        uploadDate: "2022-08-01",
+        expiryDate: "2030-08-01",
+        status: "valid"
+      }
+    ]
+  },
+  {
+    id: 6,
+    employeeId: "EMP006",
+    name: "LALJI KUMAR",
+    email: "lalji.kumar@company.com",
+    phone: "9876543215",
+    aadharNumber: "6789 0123 4567",
+    department: "STP Tank Cleaning",
+    position: "STP Operator",
+    joinDate: "2023-02-10",
+    status: "active",
+    salary: 23000,
+    uan: "101234567895",
+    esicNumber: "231234567895",
+    documents: [
+      {
+        id: 1,
+        type: "Aadhar Card",
+        name: "aadhar_card.pdf",
+        uploadDate: "2023-02-10",
+        expiryDate: "2030-02-10",
+        status: "valid"
+      }
+    ]
+  },
+  {
+    id: 7,
+    employeeId: "EMP007",
+    name: "KHUSHBOO",
+    email: "khushboo@company.com",
+    phone: "9876543216",
+    aadharNumber: "7890 1234 5678",
+    department: "Consumables Management",
+    position: "Store Keeper",
+    joinDate: "2021-11-15",
+    status: "active",
+    salary: 19000,
+    uan: "101234567896",
+    esicNumber: "231234567896",
+    documents: [
+      {
+        id: 1,
+        type: "Aadhar Card",
+        name: "aadhar_card.pdf",
+        uploadDate: "2021-11-15",
+        expiryDate: "2024-11-15",
+        status: "expiring"
+      }
+    ]
+  },
+  {
+    id: 8,
+    employeeId: "EMP008",
+    name: "SHOBHA RATHOD",
+    email: "shobha.rathod@company.com",
+    phone: "9876543217",
+    aadharNumber: "8901 2345 6789",
+    department: "Housekeeping Management",
+    position: "Cleaner",
+    joinDate: "2023-04-20",
+    status: "active",
+    salary: 18000,
+    uan: "101234567897",
+    esicNumber: "231234567897",
+    documents: [
+      {
+        id: 1,
+        type: "Aadhar Card",
+        name: "aadhar_card.pdf",
+        uploadDate: "2023-04-20",
+        expiryDate: "2030-04-20",
+        status: "valid"
+      }
+    ]
+  },
+  {
+    id: 9,
+    employeeId: "EMP009",
+    name: "RAJARAM S",
+    email: "rajaram.s@company.com",
+    phone: "9876543218",
+    aadharNumber: "9012 3456 7890",
+    department: "Security Management",
+    position: "Security Guard",
+    joinDate: "2023-07-01",
+    status: "active",
+    salary: 17000,
+    uan: "101234567898",
+    esicNumber: "231234567898",
+    documents: [
+      {
+        id: 1,
+        type: "Aadhar Card",
+        name: "aadhar_card.pdf",
+        uploadDate: "2023-07-01",
+        expiryDate: "2030-07-01",
+        status: "valid"
+      }
+    ]
+  },
+  {
+    id: 10,
+    employeeId: "EMP010",
+    name: "SWAPNIL S",
+    email: "swapnil.s@company.com",
+    phone: "9876543219",
+    aadharNumber: "0123 4567 8901",
+    department: "Parking Management",
+    position: "Parking Attendant",
+    joinDate: "2023-05-15",
+    status: "active",
+    salary: 16000,
+    uan: "101234567899",
+    esicNumber: "231234567899",
+    documents: [
+      {
+        id: 1,
+        type: "Aadhar Card",
+        name: "aadhar_card.pdf",
+        uploadDate: "2023-05-15",
+        expiryDate: "2030-05-15",
+        status: "valid"
+      }
+    ]
+  },
+  {
+    id: 11,
+    employeeId: "EMP011",
+    name: "RUPALI VAIRGAR",
+    email: "rupali.vairgar@company.com",
+    phone: "9876543220",
+    aadharNumber: "1123 4567 8901",
+    department: "Waste Management",
+    position: "Waste Collector",
+    joinDate: "2023-06-10",
+    status: "active",
+    salary: 16500,
+    uan: "101234567900",
+    esicNumber: "231234567900",
+    documents: [
+      {
+        id: 1,
+        type: "Aadhar Card",
+        name: "aadhar_card.pdf",
+        uploadDate: "2023-06-10",
+        expiryDate: "2030-06-10",
+        status: "valid"
+      }
+    ]
+  },
+  {
+    id: 12,
+    employeeId: "EMP012",
+    name: "MANISHA ADHAVE",
+    email: "manisha.adhave@company.com",
+    phone: "9876543221",
+    aadharNumber: "1223 4567 8901",
+    department: "STP Tank Cleaning",
+    position: "Cleaning Technician",
+    joinDate: "2023-08-15",
+    status: "active",
+    salary: 17500,
+    uan: "101234567901",
+    esicNumber: "231234567901",
+    documents: [
+      {
+        id: 1,
+        type: "Aadhar Card",
+        name: "aadhar_card.pdf",
+        uploadDate: "2023-08-15",
+        expiryDate: "2030-08-15",
+        status: "valid"
+      }
+    ]
+  },
+  {
+    id: 13,
+    employeeId: "EMP013",
+    name: "DHURABAI ADE",
+    email: "dhurabai.ade@company.com",
+    phone: "9876543222",
+    aadharNumber: "1323 4567 8901",
+    department: "Consumables Management",
+    position: "Inventory Manager",
+    joinDate: "2022-12-01",
+    status: "active",
+    salary: 24000,
+    uan: "101234567902",
+    esicNumber: "231234567902",
+    documents: [
+      {
+        id: 1,
+        type: "Aadhar Card",
+        name: "aadhar_card.pdf",
+        uploadDate: "2022-12-01",
+        expiryDate: "2030-12-01",
+        status: "valid"
+      }
+    ]
+  },
+  {
+    id: 14,
+    employeeId: "EMP014",
+    name: "ASHWINI KATAKR",
+    email: "ashwini.katakr@company.com",
+    phone: "9876543223",
+    aadharNumber: "1423 4567 8901",
+    department: "Housekeeping Management",
+    position: "Sanitation Officer",
+    joinDate: "2023-09-20",
+    status: "active",
+    salary: 22000,
+    uan: "101234567903",
+    esicNumber: "231234567903",
+    documents: [
+      {
+        id: 1,
+        type: "Aadhar Card",
+        name: "aadhar_card.pdf",
+        uploadDate: "2023-09-20",
+        expiryDate: "2030-09-20",
+        status: "valid"
+      }
+    ]
   }
 ];
 
 const initialLeaveRequests: LeaveRequest[] = [
   {
     id: 1,
-    employee: "Rajesh Kumar",
+    employee: "PRAVIN GAIKWAD",
     employeeId: "EMP001",
     type: "Sick Leave",
     from: "2024-01-15",
@@ -267,7 +681,7 @@ const initialLeaveRequests: LeaveRequest[] = [
   },
   {
     id: 2,
-    employee: "Priya Sharma",
+    employee: "KAILASH WAGHMARE",
     employeeId: "EMP002",
     type: "Vacation",
     from: "2024-02-01",
@@ -277,13 +691,43 @@ const initialLeaveRequests: LeaveRequest[] = [
   },
   {
     id: 3,
-    employee: "Amit Patel",
+    employee: "KALPNA RATHOD",
     employeeId: "EMP003",
     type: "Emergency Leave",
     from: "2024-01-20",
     to: "2024-01-20",
     reason: "Medical emergency",
     status: "rejected"
+  },
+  {
+    id: 4,
+    employee: "GUNDU GHORGANE",
+    employeeId: "EMP004",
+    type: "Personal Leave",
+    from: "2024-01-25",
+    to: "2024-01-26",
+    reason: "Personal work",
+    status: "pending"
+  },
+  {
+    id: 5,
+    employee: "GOVIND PILEWAD",
+    employeeId: "EMP005",
+    type: "Sick Leave",
+    from: "2024-01-18",
+    to: "2024-01-19",
+    reason: "Health issues",
+    status: "approved"
+  },
+  {
+    id: 6,
+    employee: "LALJI KUMAR",
+    employeeId: "EMP006",
+    type: "Casual Leave",
+    from: "2024-01-22",
+    to: "2024-01-22",
+    reason: "Family function",
+    status: "pending"
   }
 ];
 
@@ -291,16 +735,16 @@ const initialAttendance: Attendance[] = [
   {
     id: 1,
     employeeId: "EMP001",
-    employeeName: "Rajesh Kumar",
+    employeeName: "PRAVIN GAIKWAD",
     date: "2024-01-10",
-    checkIn: "09:00",
+    checkIn: "08:55",
     checkOut: "17:00",
     status: "present"
   },
   {
     id: 2,
     employeeId: "EMP002",
-    employeeName: "Priya Sharma",
+    employeeName: "KAILASH WAGHMARE",
     date: "2024-01-10",
     checkIn: "09:15",
     checkOut: "17:00",
@@ -309,11 +753,110 @@ const initialAttendance: Attendance[] = [
   {
     id: 3,
     employeeId: "EMP003",
-    employeeName: "Amit Patel",
+    employeeName: "KALPNA RATHOD",
     date: "2024-01-10",
     checkIn: "09:00",
     checkOut: "13:00",
     status: "half-day"
+  },
+  {
+    id: 4,
+    employeeId: "EMP004",
+    employeeName: "GUNDU GHORGANE",
+    date: "2024-01-10",
+    checkIn: "09:00",
+    checkOut: "17:00",
+    status: "present"
+  },
+  {
+    id: 5,
+    employeeId: "EMP005",
+    employeeName: "GOVIND PILEWAD",
+    date: "2024-01-10",
+    checkIn: "09:00",
+    checkOut: "17:00",
+    status: "present"
+  },
+  {
+    id: 6,
+    employeeId: "EMP006",
+    employeeName: "LALJI KUMAR",
+    date: "2024-01-10",
+    checkIn: "08:55",
+    checkOut: "17:00",
+    status: "present"
+  },
+  {
+    id: 7,
+    employeeId: "EMP007",
+    employeeName: "KHUSHBOO",
+    date: "2024-01-10",
+    checkIn: "09:20",
+    checkOut: "17:00",
+    status: "late"
+  },
+  {
+    id: 8,
+    employeeId: "EMP008",
+    employeeName: "SHOBHA RATHOD",
+    date: "2024-01-10",
+    checkIn: "09:00",
+    checkOut: "17:00",
+    status: "present"
+  },
+  {
+    id: 9,
+    employeeId: "EMP009",
+    employeeName: "RAJARAM S",
+    date: "2024-01-10",
+    checkIn: "09:00",
+    checkOut: "17:00",
+    status: "present"
+  },
+  {
+    id: 10,
+    employeeId: "EMP010",
+    employeeName: "SWAPNIL S",
+    date: "2024-01-10",
+    checkIn: "09:05",
+    checkOut: "17:00",
+    status: "present"
+  },
+  {
+    id: 11,
+    employeeId: "EMP011",
+    employeeName: "RUPALI VAIRGAR",
+    date: "2024-01-10",
+    checkIn: "09:00",
+    checkOut: "17:00",
+    status: "present"
+  },
+  {
+    id: 12,
+    employeeId: "EMP012",
+    employeeName: "MANISHA ADHAVE",
+    date: "2024-01-10",
+    checkIn: "08:50",
+    checkOut: "17:00",
+    status: "present"
+  },
+  {
+    id: 13,
+    employeeId: "EMP013",
+    employeeName: "DHURABAI ADE",
+    date: "2024-01-10",
+    checkIn: "09:00",
+    checkOut: "17:00",
+    status: "present"
+  },
+  {
+    id: 14,
+    employeeId: "EMP014",
+    employeeName: "ASHWINI KATAKR",
+    date: "2024-01-10",
+    checkIn: "09:10",
+    checkOut: "17:00",
+    status: "late"
   }
 ];
 
@@ -321,12 +864,12 @@ const initialPayroll: Payroll[] = [
   {
     id: 1,
     employeeId: "EMP001",
-    employeeName: "Rajesh Kumar",
+    employeeName: "PRAVIN GAIKWAD",
     month: "January 2024",
-    basicSalary: 70833,
-    allowances: 10000,
-    deductions: 5000,
-    netSalary: 75833,
+    basicSalary: 17500,
+    allowances: 5000,
+    deductions: 2500,
+    netSalary: 20000,
     status: "processed",
     paymentDate: "2024-01-31",
     bankAccount: "XXXXXX1234",
@@ -335,12 +878,12 @@ const initialPayroll: Payroll[] = [
   {
     id: 2,
     employeeId: "EMP002",
-    employeeName: "Priya Sharma",
+    employeeName: "KAILASH WAGHMARE",
     month: "January 2024",
-    basicSalary: 62500,
-    allowances: 8000,
-    deductions: 4500,
-    netSalary: 66000,
+    basicSalary: 15400,
+    allowances: 4500,
+    deductions: 2400,
+    netSalary: 17500,
     status: "pending",
     bankAccount: "XXXXXX5678",
     ifscCode: "HDFC0000456"
@@ -348,16 +891,57 @@ const initialPayroll: Payroll[] = [
   {
     id: 3,
     employeeId: "EMP003",
-    employeeName: "Amit Patel",
+    employeeName: "KALPNA RATHOD",
     month: "January 2024",
-    basicSalary: 75000,
-    allowances: 12000,
-    deductions: 6000,
-    netSalary: 81000,
+    basicSalary: 12600,
+    allowances: 4000,
+    deductions: 2100,
+    netSalary: 14500,
     status: "processed",
     paymentDate: "2024-01-31",
     bankAccount: "XXXXXX9012",
     ifscCode: "ICIC0000789"
+  },
+  {
+    id: 4,
+    employeeId: "EMP004",
+    employeeName: "GUNDU GHORGANE",
+    month: "January 2024",
+    basicSalary: 14000,
+    allowances: 4500,
+    deductions: 2300,
+    netSalary: 16200,
+    status: "processed",
+    paymentDate: "2024-01-31",
+    bankAccount: "XXXXXX3456",
+    ifscCode: "SBIN0000789"
+  },
+  {
+    id: 5,
+    employeeId: "EMP005",
+    employeeName: "GOVIND PILEWAD",
+    month: "January 2024",
+    basicSalary: 14700,
+    allowances: 4700,
+    deductions: 2400,
+    netSalary: 17000,
+    status: "pending",
+    bankAccount: "XXXXXX7890",
+    ifscCode: "HDFC0000123"
+  },
+  {
+    id: 6,
+    employeeId: "EMP006",
+    employeeName: "LALJI KUMAR",
+    month: "January 2024",
+    basicSalary: 16100,
+    allowances: 5200,
+    deductions: 2600,
+    netSalary: 18700,
+    status: "processed",
+    paymentDate: "2024-01-31",
+    bankAccount: "XXXXXX2345",
+    ifscCode: "ICIC0000123"
   }
 ];
 
@@ -365,32 +949,72 @@ const initialPerformance: Performance[] = [
   {
     id: 1,
     employeeId: "EMP001",
-    employeeName: "Rajesh Kumar",
-    department: "IT",
+    employeeName: "PRAVIN GAIKWAD",
+    department: "Housekeeping Management",
     kpi: 85,
     rating: 4.5,
     reviewDate: "2024-01-05",
-    feedback: "Excellent performance in project delivery"
+    feedback: "Excellent performance in maintaining cleanliness standards"
   },
   {
     id: 2,
     employeeId: "EMP002",
-    employeeName: "Priya Sharma",
-    department: "HR",
+    employeeName: "KAILASH WAGHMARE",
+    department: "Security Management",
     kpi: 92,
     rating: 4.8,
     reviewDate: "2024-01-05",
-    feedback: "Outstanding work in recruitment and employee engagement"
+    feedback: "Outstanding work in security monitoring and vigilance"
   },
   {
     id: 3,
     employeeId: "EMP003",
-    employeeName: "Amit Patel",
-    department: "Finance",
+    employeeName: "KALPNA RATHOD",
+    department: "Housekeeping Management",
     kpi: 78,
     rating: 4.2,
     reviewDate: "2024-01-05",
-    feedback: "Good financial management and reporting"
+    feedback: "Good cleaning work with attention to detail"
+  },
+  {
+    id: 4,
+    employeeId: "EMP004",
+    employeeName: "GUNDU GHORGANE",
+    department: "Parking Management",
+    kpi: 88,
+    rating: 4.6,
+    reviewDate: "2024-01-05",
+    feedback: "Excellent parking management and customer service"
+  },
+  {
+    id: 5,
+    employeeId: "EMP005",
+    employeeName: "GOVIND PILEWAD",
+    department: "Waste Management",
+    kpi: 95,
+    rating: 4.9,
+    reviewDate: "2024-01-05",
+    feedback: "Outstanding waste management and recycling efforts"
+  },
+  {
+    id: 6,
+    employeeId: "EMP006",
+    employeeName: "LALJI KUMAR",
+    department: "STP Tank Cleaning",
+    kpi: 82,
+    rating: 4.3,
+    reviewDate: "2024-01-05",
+    feedback: "Good technical skills in STP operations"
+  },
+  {
+    id: 7,
+    employeeId: "EMP007",
+    employeeName: "KHUSHBOO",
+    department: "Consumables Management",
+    kpi: 90,
+    rating: 4.7,
+    reviewDate: "2024-01-05",
+    feedback: "Excellent inventory management and organization"
   }
 ];
 
@@ -398,16 +1022,23 @@ const initialShifts: Shift[] = [
   {
     id: 1,
     name: "Morning Shift",
-    startTime: "09:00",
-    endTime: "17:00",
-    employees: ["EMP001", "EMP002"]
+    startTime: "06:00",
+    endTime: "14:00",
+    employees: ["EMP001", "EMP003", "EMP008", "EMP014"]
   },
   {
     id: 2,
     name: "Evening Shift",
     startTime: "14:00",
     endTime: "22:00",
-    employees: ["EMP003"]
+    employees: ["EMP002", "EMP004", "EMP009", "EMP010"]
+  },
+  {
+    id: 3,
+    name: "Night Shift",
+    startTime: "22:00",
+    endTime: "06:00",
+    employees: ["EMP005", "EMP006", "EMP011", "EMP012", "EMP013"]
   }
 ];
 
@@ -415,50 +1046,135 @@ const initialSalaryStructures: SalaryStructure[] = [
   {
     id: 1,
     employeeId: "EMP001",
-    basic: 42500,
-    hra: 17000,
-    da: 12750,
+    basic: 17500,
+    hra: 3500,
+    da: 2625,
     conveyance: 1600,
     medical: 1250,
-    specialAllowance: 8500,
-    otherAllowances: 4250,
-    pf: 5100,
-    esic: 637.5,
+    specialAllowance: 3500,
+    otherAllowances: 1750,
+    pf: 2100,
+    esic: 262.5,
     professionalTax: 200,
     tds: 0,
-    otherDeductions: 0
+    otherDeductions: 0,
+    workingDays: 26,
+    paidDays: 24,
+    lopDays: 2
   },
   {
     id: 2,
     employeeId: "EMP002",
-    basic: 37500,
-    hra: 15000,
-    da: 11250,
+    basic: 15400,
+    hra: 3080,
+    da: 2310,
     conveyance: 1600,
     medical: 1250,
-    specialAllowance: 7500,
-    otherAllowances: 3750,
-    pf: 4500,
-    esic: 562.5,
+    specialAllowance: 3080,
+    otherAllowances: 1540,
+    pf: 1848,
+    esic: 231,
     professionalTax: 200,
     tds: 0,
-    otherDeductions: 0
+    otherDeductions: 0,
+    workingDays: 26,
+    paidDays: 25,
+    lopDays: 1
   },
   {
     id: 3,
     employeeId: "EMP003",
-    basic: 45000,
-    hra: 18000,
-    da: 13500,
+    basic: 12600,
+    hra: 2520,
+    da: 1890,
     conveyance: 1600,
     medical: 1250,
-    specialAllowance: 9000,
-    otherAllowances: 4500,
-    pf: 5400,
-    esic: 675,
+    specialAllowance: 2520,
+    otherAllowances: 1260,
+    pf: 1512,
+    esic: 189,
     professionalTax: 200,
     tds: 0,
-    otherDeductions: 0
+    otherDeductions: 0,
+    workingDays: 26,
+    paidDays: 23,
+    lopDays: 3
+  },
+  {
+    id: 4,
+    employeeId: "EMP004",
+    basic: 14000,
+    hra: 2800,
+    da: 2100,
+    conveyance: 1600,
+    medical: 1250,
+    specialAllowance: 2800,
+    otherAllowances: 1400,
+    pf: 1680,
+    esic: 210,
+    professionalTax: 200,
+    tds: 0,
+    otherDeductions: 0,
+    workingDays: 26,
+    paidDays: 26,
+    lopDays: 0
+  },
+  {
+    id: 5,
+    employeeId: "EMP005",
+    basic: 14700,
+    hra: 2940,
+    da: 2205,
+    conveyance: 1600,
+    medical: 1250,
+    specialAllowance: 2940,
+    otherAllowances: 1470,
+    pf: 1764,
+    esic: 220.5,
+    professionalTax: 200,
+    tds: 0,
+    otherDeductions: 0,
+    workingDays: 26,
+    paidDays: 25,
+    lopDays: 1
+  },
+  {
+    id: 6,
+    employeeId: "EMP006",
+    basic: 16100,
+    hra: 3220,
+    da: 2415,
+    conveyance: 1600,
+    medical: 1250,
+    specialAllowance: 3220,
+    otherAllowances: 1610,
+    pf: 1932,
+    esic: 241.5,
+    professionalTax: 200,
+    tds: 0,
+    otherDeductions: 0,
+    workingDays: 26,
+    paidDays: 26,
+    lopDays: 0
+  },
+  {
+    id: 7,
+    employeeId: "EMP007",
+    basic: 13300,
+    hra: 2660,
+    da: 1995,
+    conveyance: 1600,
+    medical: 1250,
+    specialAllowance: 2660,
+    otherAllowances: 1330,
+    pf: 1596,
+    esic: 199.5,
+    professionalTax: 200,
+    tds: 0,
+    otherDeductions: 0,
+    workingDays: 26,
+    paidDays: 24,
+    lopDays: 2
   }
 ];
 
@@ -466,31 +1182,61 @@ const initialSalarySlips: SalarySlip[] = [
   {
     id: 1,
     employeeId: "EMP001",
-    employeeName: "Rajesh Kumar",
+    employeeName: "PRAVIN GAIKWAD",
     month: "January 2024",
-    paidDays: 26,
-    designation: "Senior Developer",
+    paidDays: 24,
+    designation: "Housekeeping Supervisor",
     uan: "101234567890",
     esicNumber: "231234567890",
     earnings: {
-      basic: 42500,
-      da: 12750,
-      hra: 17000,
+      basic: 17500,
+      da: 2625,
+      hra: 3500,
       cca: 1600,
       washing: 800,
       leave: 0,
       medical: 1250,
       bonus: 0,
-      otherAllowances: 4250
+      otherAllowances: 1750
     },
     deductions: {
-      pf: 5100,
-      esic: 637.5,
+      pf: 2100,
+      esic: 262.5,
       monthlyDeductions: 0,
       mlwf: 25,
       professionalTax: 200
     },
-    netSalary: 75833,
+    netSalary: 20000,
+    generatedDate: "2024-01-31"
+  },
+  {
+    id: 2,
+    employeeId: "EMP002",
+    employeeName: "KAILASH WAGHMARE",
+    month: "January 2024",
+    paidDays: 25,
+    designation: "Security Supervisor",
+    uan: "101234567891",
+    esicNumber: "231234567891",
+    earnings: {
+      basic: 15400,
+      da: 2310,
+      hra: 3080,
+      cca: 1600,
+      washing: 800,
+      leave: 0,
+      medical: 1250,
+      bonus: 0,
+      otherAllowances: 1540
+    },
+    deductions: {
+      pf: 1848,
+      esic: 231,
+      monthlyDeductions: 0,
+      mlwf: 25,
+      professionalTax: 200
+    },
+    netSalary: 17500,
     generatedDate: "2024-01-31"
   }
 ];
@@ -647,7 +1393,7 @@ const importFromExcel = (file: File, setEmployees: React.Dispatch<React.SetState
           position: values[headers.indexOf('position')] || '',
           joinDate: values[headers.indexOf('joinDate')] || new Date().toISOString().split('T')[0],
           status: 'active',
-          salary: Number(values[headers.indexOf('salary')]) || 30000,
+          salary: Number(values[headers.indexOf('salary')]) || 18000,
           uan: `1012345678${String(initialEmployees.length + i).padStart(2, '0')}`,
           esicNumber: `2312345678${String(initialEmployees.length + i).padStart(2, '0')}`,
           documents: []
@@ -752,8 +1498,311 @@ const ExcelImportDialog = ({
   );
 };
 
+// Calculate Employee Attendance Function
+const calculateEmployeeAttendance = (employeeId: string, month: string, attendanceData: Attendance[]) => {
+  const monthAttendance = attendanceData.filter(record => 
+    record.employeeId === employeeId && 
+    record.date.startsWith(month)
+  );
+  
+  const totalDays = monthAttendance.length;
+  const presentDays = monthAttendance.filter(record => 
+    record.status === 'present' || record.status === 'late'
+  ).length;
+  const halfDays = monthAttendance.filter(record => 
+    record.status === 'half-day'
+  ).length;
+  const absentDays = monthAttendance.filter(record => 
+    record.status === 'absent'
+  ).length;
+  
+  // Calculate paid days (present + 0.5 for half days)
+  const paidDays = presentDays + (halfDays * 0.5);
+  const workingDays = 26; // Standard working days per month
+  const lopDays = workingDays - paidDays;
+  
+  return {
+    totalDays,
+    presentDays,
+    halfDays,
+    absentDays,
+    paidDays,
+    workingDays,
+    lopDays
+  };
+};
+
+// Enhanced SalaryStructuresTable Component with Attendance Integration
+const SalaryStructuresTable = ({ 
+  employees, 
+  salaryStructures, 
+  attendance,
+  selectedMonth,
+  onUpdateSalaryStructure 
+}: { 
+  employees: Employee[];
+  salaryStructures: SalaryStructure[];
+  attendance: Attendance[];
+  selectedMonth: string;
+  onUpdateSalaryStructure: (employeeId: string, updates: Partial<SalaryStructure>) => void;
+}) => {
+  const calculateProRatedSalary = (basicSalary: number, paidDays: number, workingDays: number) => {
+    return (basicSalary / workingDays) * paidDays;
+  };
+
+  const calculateSalaryComponents = (basicSalary: number, paidDays: number, workingDays: number) => {
+    const proRatedBasic = calculateProRatedSalary(basicSalary, paidDays, workingDays);
+    
+    return {
+      basic: proRatedBasic,
+      hra: proRatedBasic * 0.2, // 20% of basic
+      da: proRatedBasic * 0.15,  // 15% of basic
+      conveyance: paidDays >= 15 ? 1600 : (1600 / workingDays) * paidDays, // Full conveyance if 15+ days worked
+      medical: 1250, // Fixed medical allowance
+      specialAllowance: proRatedBasic * 0.2, // 20% of basic
+      otherAllowances: proRatedBasic * 0.1, // 10% of basic
+      pf: Math.min(proRatedBasic * 0.12, 1800), // 12% of basic, max ₹1800
+      esic: proRatedBasic * 0.0075, // 0.75% of basic
+      professionalTax: paidDays > 0 ? 200 : 0, // Professional tax only if worked
+      workingDays,
+      paidDays,
+      lopDays: workingDays - paidDays
+    };
+  };
+
+  const handleAutoCalculate = (employeeId: string, basicSalary: number) => {
+    const attendanceData = calculateEmployeeAttendance(employeeId, selectedMonth, attendance);
+    const components = calculateSalaryComponents(basicSalary, attendanceData.paidDays, attendanceData.workingDays);
+    onUpdateSalaryStructure(employeeId, components);
+  };
+
+  const handleWorkingDaysChange = (employeeId: string, workingDays: number) => {
+    const structure = salaryStructures.find(s => s.employeeId === employeeId);
+    if (structure) {
+      const paidDays = Math.min(structure.paidDays, workingDays);
+      const lopDays = workingDays - paidDays;
+      
+      onUpdateSalaryStructure(employeeId, {
+        workingDays,
+        paidDays,
+        lopDays
+      });
+    }
+  };
+
+  const handlePaidDaysChange = (employeeId: string, paidDays: number) => {
+    const structure = salaryStructures.find(s => s.employeeId === employeeId);
+    if (structure) {
+      const validatedPaidDays = Math.min(paidDays, structure.workingDays);
+      const lopDays = structure.workingDays - validatedPaidDays;
+      
+      onUpdateSalaryStructure(employeeId, {
+        paidDays: validatedPaidDays,
+        lopDays
+      });
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <div>
+          <h3 className="text-lg font-semibold">Salary Structures with Attendance Integration</h3>
+          <p className="text-sm text-muted-foreground">
+            Working days and paid days are automatically calculated from attendance records
+          </p>
+        </div>
+        <div className="text-sm text-muted-foreground">
+          Selected Month: {new Date(selectedMonth + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+        </div>
+      </div>
+
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Employee</TableHead>
+            <TableHead>Attendance</TableHead>
+            <TableHead>Basic</TableHead>
+            <TableHead>HRA</TableHead>
+            <TableHead>DA</TableHead>
+            <TableHead>Conveyance</TableHead>
+            <TableHead>Medical</TableHead>
+            <TableHead>Special Allowance</TableHead>
+            <TableHead>PF</TableHead>
+            <TableHead>ESIC</TableHead>
+            <TableHead>Prof. Tax</TableHead>
+            <TableHead>Net Salary</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {employees.filter(emp => emp.status === "active").map((employee) => {
+            const structure = salaryStructures.find(s => s.employeeId === employee.employeeId);
+            const attendanceData = calculateEmployeeAttendance(employee.employeeId, selectedMonth, attendance);
+            
+            if (!structure) return null;
+
+            const totalEarnings = 
+              (structure.basic || 0) + 
+              (structure.hra || 0) + 
+              (structure.da || 0) + 
+              (structure.conveyance || 0) + 
+              (structure.medical || 0) + 
+              (structure.specialAllowance || 0) + 
+              (structure.otherAllowances || 0);
+
+            const totalDeductions = 
+              (structure.pf || 0) + 
+              (structure.esic || 0) + 
+              (structure.professionalTax || 0) + 
+              (structure.tds || 0) + 
+              (structure.otherDeductions || 0);
+
+            const netSalary = totalEarnings - totalDeductions;
+
+            return (
+              <TableRow key={employee.id}>
+                <TableCell className="font-medium">
+                  <div>{employee.name}</div>
+                  <div className="text-sm text-muted-foreground">{employee.employeeId}</div>
+                </TableCell>
+                
+                {/* Attendance Summary */}
+                <TableCell>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span>Working:</span>
+                      <Input
+                        type="number"
+                        value={structure.workingDays}
+                        onChange={(e) => handleWorkingDaysChange(employee.employeeId, Number(e.target.value))}
+                        className="w-16 h-6 text-xs"
+                        min="0"
+                        max="31"
+                      />
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Paid:</span>
+                      <Input
+                        type="number"
+                        value={structure.paidDays}
+                        onChange={(e) => handlePaidDaysChange(employee.employeeId, Number(e.target.value))}
+                        className="w-16 h-6 text-xs"
+                        min="0"
+                        max={structure.workingDays}
+                      />
+                    </div>
+                    <div className="flex justify-between text-destructive">
+                      <span>LOP:</span>
+                      <span>{structure.lopDays}</span>
+                    </div>
+                  </div>
+                </TableCell>
+
+                {/* Salary Components */}
+                <TableCell>
+                  <Input
+                    type="number"
+                    value={structure.basic}
+                    onChange={(e) => onUpdateSalaryStructure(employee.employeeId, { basic: Number(e.target.value) })}
+                    className="w-24"
+                  />
+                </TableCell>
+                <TableCell>₹{(structure.hra || 0).toLocaleString()}</TableCell>
+                <TableCell>₹{(structure.da || 0).toLocaleString()}</TableCell>
+                <TableCell>₹{(structure.conveyance || 0).toLocaleString()}</TableCell>
+                <TableCell>₹{(structure.medical || 0).toLocaleString()}</TableCell>
+                <TableCell>₹{(structure.specialAllowance || 0).toLocaleString()}</TableCell>
+                <TableCell>₹{(structure.pf || 0).toLocaleString()}</TableCell>
+                <TableCell>₹{(structure.esic || 0).toLocaleString()}</TableCell>
+                <TableCell>₹{(structure.professionalTax || 0).toLocaleString()}</TableCell>
+                
+                {/* Net Salary */}
+                <TableCell className="font-semibold">
+                  ₹{netSalary.toLocaleString()}
+                </TableCell>
+                
+                <TableCell>
+                  <div className="flex flex-col gap-1">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleAutoCalculate(employee.employeeId, employee.salary)}
+                    >
+                      Auto Calculate
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => {
+                        const currentAttendance = calculateEmployeeAttendance(employee.employeeId, selectedMonth, attendance);
+                        onUpdateSalaryStructure(employee.employeeId, {
+                          workingDays: currentAttendance.workingDays,
+                          paidDays: currentAttendance.paidDays,
+                          lopDays: currentAttendance.lopDays
+                        });
+                      }}
+                    >
+                      Sync Attendance
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+
+      {/* Summary Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Salary Calculation Summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <div className="font-medium">Total Employees</div>
+              <div>{employees.filter(emp => emp.status === "active").length}</div>
+            </div>
+            <div>
+              <div className="font-medium">Total Monthly Salary</div>
+              <div>₹{employees.reduce((sum, emp) => sum + emp.salary, 0).toLocaleString()}</div>
+            </div>
+            <div>
+              <div className="font-medium">Total LOP Days</div>
+              <div className="text-destructive">
+                {salaryStructures.reduce((sum, s) => sum + (s.lopDays || 0), 0)}
+              </div>
+            </div>
+            <div>
+              <div className="font-medium">Adjusted Salary</div>
+              <div>₹{
+                salaryStructures.reduce((sum, structure) => {
+                  const totalEarnings = 
+                    (structure.basic || 0) + 
+                    (structure.hra || 0) + 
+                    (structure.da || 0) + 
+                    (structure.conveyance || 0) + 
+                    (structure.medical || 0) + 
+                    (structure.specialAllowance || 0) + 
+                    (structure.otherAllowances || 0);
+                  const totalDeductions = 
+                    (structure.pf || 0) + 
+                    (structure.esic || 0) + 
+                    (structure.professionalTax || 0);
+                  return sum + (totalEarnings - totalDeductions);
+                }, 0).toLocaleString()
+              }</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
 // Salary Slip Card Component
-const SalarySlipCard = ({ slip }: { slip: SalarySlip }) => {
+const SalarySlipCard = ({ slip, salaryStructure }: { slip: SalarySlip; salaryStructure?: SalaryStructure }) => {
   const totalEarnings = Object.values(slip.earnings).reduce((sum, amount) => sum + amount, 0);
   const totalDeductions = Object.values(slip.deductions).reduce((sum, amount) => sum + amount, 0);
 
@@ -774,16 +1823,24 @@ const SalarySlipCard = ({ slip }: { slip: SalarySlip }) => {
           </div>
         </div>
 
-        {/* Employee Details */}
+        {/* Employee Details with Attendance */}
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div>
             <div><strong>Name:</strong> {slip.employeeName}</div>
-            <div><strong>Paid Days:</strong> {slip.paidDays}</div>
+            <div><strong>Designation:</strong> {slip.designation}</div>
+            {salaryStructure && (
+              <>
+                <div><strong>Working Days:</strong> {salaryStructure.workingDays}</div>
+                <div><strong>Paid Days:</strong> {salaryStructure.paidDays}</div>
+                <div><strong>LOP Days:</strong> {salaryStructure.lopDays}</div>
+              </>
+            )}
           </div>
           <div>
-            <div><strong>Designation:</strong> {slip.designation}</div>
-            <div><strong>ESIC NO:</strong> {slip.esicNumber}</div>
+            <div><strong>Employee ID:</strong> {slip.employeeId}</div>
             <div><strong>UAN:</strong> {slip.uan}</div>
+            <div><strong>ESIC NO:</strong> {slip.esicNumber}</div>
+            <div><strong>Payment Date:</strong> {slip.generatedDate}</div>
           </div>
         </div>
 
@@ -796,13 +1853,15 @@ const SalarySlipCard = ({ slip }: { slip: SalarySlip }) => {
             </div>
             <div className="space-y-2">
               {Object.entries(slip.earnings).map(([key, amount]) => (
-                <div key={key} className="flex justify-between">
-                  <span>{key.toUpperCase()}</span>
-                  <span>₹{amount.toLocaleString()}</span>
-                </div>
+                amount > 0 && (
+                  <div key={key} className="flex justify-between">
+                    <span>{key.toUpperCase().replace(/([A-Z])/g, ' $1').trim()}</span>
+                    <span>₹{amount.toLocaleString()}</span>
+                  </div>
+                )
               ))}
               <div className="flex justify-between font-bold border-t-2 border-gray-300 pt-2">
-                <span>TOTAL</span>
+                <span>TOTAL EARNINGS</span>
                 <span>₹{totalEarnings.toLocaleString()}</span>
               </div>
             </div>
@@ -815,13 +1874,15 @@ const SalarySlipCard = ({ slip }: { slip: SalarySlip }) => {
             </div>
             <div className="space-y-2">
               {Object.entries(slip.deductions).map(([key, amount]) => (
-                <div key={key} className="flex justify-between">
-                  <span>{key.toUpperCase()}</span>
-                  <span>₹{amount.toLocaleString()}</span>
-                </div>
+                amount > 0 && (
+                  <div key={key} className="flex justify-between">
+                    <span>{key.toUpperCase().replace(/([A-Z])/g, ' $1').trim()}</span>
+                    <span>₹{amount.toLocaleString()}</span>
+                  </div>
+                )
               ))}
               <div className="flex justify-between font-bold border-t-2 border-gray-300 pt-2">
-                <span>TOTAL DEDUCTION</span>
+                <span>TOTAL DEDUCTIONS</span>
                 <span>₹{totalDeductions.toLocaleString()}</span>
               </div>
             </div>
@@ -833,6 +1894,11 @@ const SalarySlipCard = ({ slip }: { slip: SalarySlip }) => {
           <div className="font-bold text-lg">
             NET PAYABLE: ₹{slip.netSalary.toLocaleString()}
           </div>
+          {salaryStructure && salaryStructure.lopDays > 0 && (
+            <div className="text-sm text-destructive mt-2">
+              Note: Salary adjusted for {salaryStructure.lopDays} Loss of Pay day(s)
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -860,89 +1926,271 @@ const SalarySlipCard = ({ slip }: { slip: SalarySlip }) => {
   );
 };
 
-// Salary Structures Table Component
-const SalaryStructuresTable = ({ 
+// Payroll Section Component
+const PayrollSection = ({ 
   employees, 
+  payroll, 
   salaryStructures, 
-  onUpdateSalaryStructure 
+  salarySlips, 
+  attendance,
+  selectedMonth,
+  onProcessPayroll,
+  onGenerateSalary,
+  onBulkSalaryGenerate,
+  onUpdateSalaryStructure
 }: { 
   employees: Employee[];
+  payroll: Payroll[];
   salaryStructures: SalaryStructure[];
+  salarySlips: SalarySlip[];
+  attendance: Attendance[];
+  selectedMonth: string;
+  onProcessPayroll: (id: number) => void;
+  onGenerateSalary: (employeeId: string) => void;
+  onBulkSalaryGenerate: () => void;
   onUpdateSalaryStructure: (employeeId: string, updates: Partial<SalaryStructure>) => void;
 }) => {
-  const calculateSalaryComponents = (basicSalary: number) => {
-    return {
-      basic: basicSalary * 0.5,
-      hra: basicSalary * 0.2,
-      da: basicSalary * 0.15,
-      conveyance: 1600,
-      medical: 1250,
-      specialAllowance: basicSalary * 0.1,
-      otherAllowances: basicSalary * 0.05,
-      pf: basicSalary * 0.12,
-      esic: basicSalary * 0.0075,
-      professionalTax: 200
-    };
+  const [activePayrollTab, setActivePayrollTab] = useState("salary-slips");
+  const [salaryDialogOpen, setSalaryDialogOpen] = useState(false);
+  const [selectedEmployeeForSalary, setSelectedEmployeeForSalary] = useState<string>("");
+
+  // Pagination state for payroll tables
+  const [payrollPage, setPayrollPage] = useState(1);
+  const [payrollItemsPerPage, setPayrollItemsPerPage] = useState(5);
+  const [salarySlipsPage, setSalarySlipsPage] = useState(1);
+  const [salarySlipsItemsPerPage, setSalarySlipsItemsPerPage] = useState(3);
+
+  const payrollSummary = {
+    total: payroll.reduce((sum, p) => sum + p.netSalary, 0),
+    processed: payroll.filter(p => p.status === "processed").length,
+    pending: payroll.filter(p => p.status === "pending").length
   };
 
+  // Paginated payroll data
+  const paginatedPayroll = payroll.slice(
+    (payrollPage - 1) * payrollItemsPerPage,
+    payrollPage * payrollItemsPerPage
+  );
+
+  // Paginated salary slips data
+  const paginatedSalarySlips = salarySlips.slice(
+    (salarySlipsPage - 1) * salarySlipsItemsPerPage,
+    salarySlipsPage * salarySlipsItemsPerPage
+  );
+
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Employee</TableHead>
-          <TableHead>Basic</TableHead>
-          <TableHead>HRA</TableHead>
-          <TableHead>DA</TableHead>
-          <TableHead>Conveyance</TableHead>
-          <TableHead>Medical</TableHead>
-          <TableHead>Special Allowance</TableHead>
-          <TableHead>PF</TableHead>
-          <TableHead>ESIC</TableHead>
-          <TableHead>Professional Tax</TableHead>
-          <TableHead>Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {employees.filter(emp => emp.status === "active").map((employee) => {
-          const structure = salaryStructures.find(s => s.employeeId === employee.employeeId);
-          return (
-            <TableRow key={employee.id}>
-              <TableCell className="font-medium">
-                <div>{employee.name}</div>
-                <div className="text-sm text-muted-foreground">{employee.employeeId}</div>
-              </TableCell>
-              <TableCell>
-                <Input
-                  type="number"
-                  value={structure?.basic || 0}
-                  onChange={(e) => onUpdateSalaryStructure(employee.employeeId, { basic: Number(e.target.value) })}
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Payroll</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">₹{payrollSummary.total.toLocaleString()}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Processed</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{payrollSummary.processed}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-muted-foreground">{payrollSummary.pending}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Salary Slips</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{salarySlips.length}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div>Payroll Management</div>
+            <div className="flex gap-2">
+              <Button onClick={onBulkSalaryGenerate}>
+                <Download className="mr-2 h-4 w-4" />
+                Bulk Generate
+              </Button>
+              <Dialog open={salaryDialogOpen} onOpenChange={setSalaryDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Generate Salary
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Generate Salary Slip</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <FormField label="Select Employee" id="employee">
+                      <Select value={selectedEmployeeForSalary} onValueChange={setSelectedEmployeeForSalary}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select employee" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {employees.filter(emp => emp.status === "active").map(emp => (
+                            <SelectItem key={emp.id} value={emp.employeeId}>
+                              {emp.name} ({emp.employeeId})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormField>
+                    <FormField label="Select Month" id="month">
+                      <Input
+                        type="month"
+                        value={selectedMonth}
+                        onChange={(e) => {/* Handle month change */}}
+                      />
+                    </FormField>
+                    <Button 
+                      onClick={() => {
+                        onGenerateSalary(selectedEmployeeForSalary);
+                        setSalaryDialogOpen(false);
+                      }}
+                      disabled={!selectedEmployeeForSalary}
+                      className="w-full"
+                    >
+                      Generate Salary Slip
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={activePayrollTab} onValueChange={setActivePayrollTab}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="salary-slips">Salary Slips</TabsTrigger>
+              <TabsTrigger value="salary-structures">Salary Structures</TabsTrigger>
+              <TabsTrigger value="payroll-records">Payroll Records</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="salary-slips" className="space-y-4">
+              <div className="grid gap-4">
+                {paginatedSalarySlips.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No salary slips generated yet. Generate your first salary slip.
+                  </div>
+                ) : (
+                  paginatedSalarySlips.map((slip) => {
+                    const salaryStructure = salaryStructures.find(s => s.employeeId === slip.employeeId);
+                    return (
+                      <SalarySlipCard key={slip.id} slip={slip} salaryStructure={salaryStructure} />
+                    );
+                  })
+                )}
+              </div>
+              
+              {/* Pagination for Salary Slips */}
+              {salarySlips.length > 0 && (
+                <Pagination
+                  currentPage={salarySlipsPage}
+                  totalPages={Math.ceil(salarySlips.length / salarySlipsItemsPerPage)}
+                  totalItems={salarySlips.length}
+                  itemsPerPage={salarySlipsItemsPerPage}
+                  onPageChange={setSalarySlipsPage}
+                  onItemsPerPageChange={setSalarySlipsItemsPerPage}
                 />
-              </TableCell>
-              <TableCell>₹{(structure?.hra || 0).toLocaleString()}</TableCell>
-              <TableCell>₹{(structure?.da || 0).toLocaleString()}</TableCell>
-              <TableCell>₹{(structure?.conveyance || 0).toLocaleString()}</TableCell>
-              <TableCell>₹{(structure?.medical || 0).toLocaleString()}</TableCell>
-              <TableCell>₹{(structure?.specialAllowance || 0).toLocaleString()}</TableCell>
-              <TableCell>₹{(structure?.pf || 0).toLocaleString()}</TableCell>
-              <TableCell>₹{(structure?.esic || 0).toLocaleString()}</TableCell>
-              <TableCell>₹{(structure?.professionalTax || 0).toLocaleString()}</TableCell>
-              <TableCell>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => {
-                    const components = calculateSalaryComponents(employee.salary);
-                    onUpdateSalaryStructure(employee.employeeId, components);
-                  }}
-                >
-                  Auto Calculate
-                </Button>
-              </TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+              )}
+            </TabsContent>
+
+            <TabsContent value="salary-structures" className="space-y-4">
+              <SalaryStructuresTable 
+                employees={employees} 
+                salaryStructures={salaryStructures}
+                attendance={attendance}
+                selectedMonth={selectedMonth}
+                onUpdateSalaryStructure={onUpdateSalaryStructure}
+              />
+            </TabsContent>
+
+            <TabsContent value="payroll-records" className="space-y-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Month</TableHead>
+                    <TableHead>Basic Salary</TableHead>
+                    <TableHead>Allowances</TableHead>
+                    <TableHead>Deductions</TableHead>
+                    <TableHead>Net Salary</TableHead>
+                    <TableHead>Bank Details</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedPayroll.map((pay) => (
+                    <TableRow key={pay.id}>
+                      <TableCell className="font-medium">{pay.employeeName}</TableCell>
+                      <TableCell>{pay.month}</TableCell>
+                      <TableCell>₹{pay.basicSalary.toLocaleString()}</TableCell>
+                      <TableCell>₹{pay.allowances.toLocaleString()}</TableCell>
+                      <TableCell>₹{pay.deductions.toLocaleString()}</TableCell>
+                      <TableCell className="font-semibold">₹{pay.netSalary.toLocaleString()}</TableCell>
+                      <TableCell>
+                        <div className="text-xs">
+                          <div>Acc: {pay.bankAccount}</div>
+                          <div>IFSC: {pay.ifscCode}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={pay.status === "processed" ? "default" : "secondary"}>
+                          {pay.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {pay.status === "pending" && (
+                          <Button 
+                            size="sm" 
+                            onClick={() => onProcessPayroll(pay.id)}
+                          >
+                            Process
+                          </Button>
+                        )}
+                        {pay.status === "processed" && pay.paymentDate && (
+                          <Badge variant="outline">
+                            Paid on {pay.paymentDate}
+                          </Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              
+              {/* Pagination for Payroll Records */}
+              {payroll.length > 0 && (
+                <Pagination
+                  currentPage={payrollPage}
+                  totalPages={Math.ceil(payroll.length / payrollItemsPerPage)}
+                  totalItems={payroll.length}
+                  itemsPerPage={payrollItemsPerPage}
+                  onPageChange={setPayrollPage}
+                  onItemsPerPageChange={setPayrollItemsPerPage}
+                />
+              )}
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
@@ -958,13 +2206,21 @@ const HRMS = () => {
   const [salarySlips, setSalarySlips] = useState<SalarySlip[]>(initialSalarySlips);
   const [activeTab, setActiveTab] = useState("employees");
   const [searchTerm, setSearchTerm] = useState("");
-  const [salaryDialogOpen, setSalaryDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [selectedEmployeeForSalary, setSelectedEmployeeForSalary] = useState<string>("");
   const [selectedMonth, setSelectedMonth] = useState(
     new Date().toISOString().slice(0, 7) // Current month in YYYY-MM format
   );
   
+  // Pagination states for different tabs
+  const [employeesPage, setEmployeesPage] = useState(1);
+  const [employeesItemsPerPage, setEmployeesItemsPerPage] = useState(5);
+  const [leaveRequestsPage, setLeaveRequestsPage] = useState(1);
+  const [leaveRequestsItemsPerPage, setLeaveRequestsItemsPerPage] = useState(5);
+  const [attendancePage, setAttendancePage] = useState(1);
+  const [attendanceItemsPerPage, setAttendanceItemsPerPage] = useState(5);
+  const [performancePage, setPerformancePage] = useState(1);
+  const [performanceItemsPerPage, setPerformanceItemsPerPage] = useState(5);
+
   // New Employee Form State
   const [newEmployee, setNewEmployee] = useState({
     name: "",
@@ -980,8 +2236,8 @@ const HRMS = () => {
   // New Shift Form State
   const [newShift, setNewShift] = useState({
     name: "",
-    startTime: "09:00",
-    endTime: "17:00",
+    startTime: "06:00",
+    endTime: "14:00",
     employees: [] as string[]
   });
 
@@ -1023,18 +2279,21 @@ const HRMS = () => {
     const defaultSalaryStructure: SalaryStructure = {
       id: salaryStructures.length + 1,
       employeeId: employee.employeeId,
-      basic: Number(newEmployee.salary) * 0.5,
+      basic: Number(newEmployee.salary) * 0.7,
       hra: Number(newEmployee.salary) * 0.2,
       da: Number(newEmployee.salary) * 0.15,
       conveyance: 1600,
       medical: 1250,
-      specialAllowance: Number(newEmployee.salary) * 0.1,
-      otherAllowances: Number(newEmployee.salary) * 0.05,
+      specialAllowance: Number(newEmployee.salary) * 0.2,
+      otherAllowances: Number(newEmployee.salary) * 0.1,
       pf: Number(newEmployee.salary) * 0.12,
       esic: Number(newEmployee.salary) * 0.0075,
       professionalTax: 200,
       tds: 0,
-      otherDeductions: 0
+      otherDeductions: 0,
+      workingDays: 26,
+      paidDays: 26,
+      lopDays: 0
     };
 
     setEmployees([...employees, employee]);
@@ -1125,7 +2384,7 @@ const HRMS = () => {
     };
 
     setShifts([...shifts, shift]);
-    setNewShift({ name: "", startTime: "09:00", endTime: "17:00", employees: [] });
+    setNewShift({ name: "", startTime: "06:00", endTime: "14:00", employees: [] });
     toast.success("Shift created successfully!");
   };
 
@@ -1178,7 +2437,7 @@ const HRMS = () => {
       employeeId: employee.employeeId,
       employeeName: employee.name,
       month: new Date(selectedMonth + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }),
-      paidDays: 26, // This should be calculated from attendance
+      paidDays: salaryStructure.paidDays,
       designation: employee.position,
       uan: employee.uan || "101234567890",
       esicNumber: employee.esicNumber || "231234567890",
@@ -1241,10 +2500,31 @@ const HRMS = () => {
     }
   };
 
+  // Filtered and paginated data
   const filteredEmployees = employees.filter(emp =>
     emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     emp.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
     emp.department.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const paginatedEmployees = filteredEmployees.slice(
+    (employeesPage - 1) * employeesItemsPerPage,
+    employeesPage * employeesItemsPerPage
+  );
+
+  const paginatedLeaveRequests = leaveRequests.slice(
+    (leaveRequestsPage - 1) * leaveRequestsItemsPerPage,
+    leaveRequestsPage * leaveRequestsItemsPerPage
+  );
+
+  const paginatedAttendance = attendance.slice(
+    (attendancePage - 1) * attendanceItemsPerPage,
+    attendancePage * attendanceItemsPerPage
+  );
+
+  const paginatedPerformance = performance.slice(
+    (performancePage - 1) * performanceItemsPerPage,
+    performancePage * performanceItemsPerPage
   );
 
   // Reports Data
@@ -1270,194 +2550,6 @@ const HRMS = () => {
       status: doc.status
     }))
   );
-
-  // Payroll Section Component
-  const PayrollSection = () => {
-    const [activePayrollTab, setActivePayrollTab] = useState("salary-slips");
-
-    return (
-      <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total Payroll</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">₹{payrollSummary.total.toLocaleString()}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Processed</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-primary">{payrollSummary.processed}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Pending</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-muted-foreground">{payrollSummary.pending}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Salary Slips</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{salarySlips.length}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div>Payroll Management</div>
-              <div className="flex gap-2">
-                <Button onClick={handleBulkSalaryGenerate}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Bulk Generate
-                </Button>
-                <Dialog open={salaryDialogOpen} onOpenChange={setSalaryDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Generate Salary
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                      <DialogTitle>Generate Salary Slip</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <FormField label="Select Employee" id="employee">
-                        <Select value={selectedEmployeeForSalary} onValueChange={setSelectedEmployeeForSalary}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select employee" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {employees.filter(emp => emp.status === "active").map(emp => (
-                              <SelectItem key={emp.id} value={emp.employeeId}>
-                                {emp.name} ({emp.employeeId})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormField>
-                      <FormField label="Select Month" id="month">
-                        <Input
-                          type="month"
-                          value={selectedMonth}
-                          onChange={(e) => setSelectedMonth(e.target.value)}
-                        />
-                      </FormField>
-                      <Button 
-                        onClick={() => handleGenerateSalary(selectedEmployeeForSalary)}
-                        disabled={!selectedEmployeeForSalary}
-                        className="w-full"
-                      >
-                        Generate Salary Slip
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs value={activePayrollTab} onValueChange={setActivePayrollTab}>
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="salary-slips">Salary Slips</TabsTrigger>
-                <TabsTrigger value="salary-structures">Salary Structures</TabsTrigger>
-                <TabsTrigger value="payroll-records">Payroll Records</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="salary-slips" className="space-y-4">
-                <div className="grid gap-4">
-                  {salarySlips.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No salary slips generated yet. Generate your first salary slip.
-                    </div>
-                  ) : (
-                    salarySlips.map((slip) => (
-                      <SalarySlipCard key={slip.id} slip={slip} />
-                    ))
-                  )}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="salary-structures" className="space-y-4">
-                <SalaryStructuresTable 
-                  employees={employees} 
-                  salaryStructures={salaryStructures}
-                  onUpdateSalaryStructure={handleUpdateSalaryStructure}
-                />
-              </TabsContent>
-
-              <TabsContent value="payroll-records" className="space-y-4">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Employee</TableHead>
-                      <TableHead>Month</TableHead>
-                      <TableHead>Basic Salary</TableHead>
-                      <TableHead>Allowances</TableHead>
-                      <TableHead>Deductions</TableHead>
-                      <TableHead>Net Salary</TableHead>
-                      <TableHead>Bank Details</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {payroll.map((pay) => (
-                      <TableRow key={pay.id}>
-                        <TableCell className="font-medium">{pay.employeeName}</TableCell>
-                        <TableCell>{pay.month}</TableCell>
-                        <TableCell>₹{pay.basicSalary.toLocaleString()}</TableCell>
-                        <TableCell>₹{pay.allowances.toLocaleString()}</TableCell>
-                        <TableCell>₹{pay.deductions.toLocaleString()}</TableCell>
-                        <TableCell className="font-semibold">₹{pay.netSalary.toLocaleString()}</TableCell>
-                        <TableCell>
-                          <div className="text-xs">
-                            <div>Acc: {pay.bankAccount}</div>
-                            <div>IFSC: {pay.ifscCode}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getStatusColor(pay.status)}>
-                            {pay.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {pay.status === "pending" && (
-                            <Button 
-                              size="sm" 
-                              onClick={() => handleProcessPayroll(pay.id)}
-                            >
-                              Process
-                            </Button>
-                          )}
-                          {pay.status === "processed" && pay.paymentDate && (
-                            <Badge variant="outline">
-                              Paid on {pay.paymentDate}
-                            </Badge>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -1555,7 +2647,7 @@ const HRMS = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredEmployees.map((employee) => (
+                    {paginatedEmployees.map((employee) => (
                       <TableRow key={employee.id}>
                         <TableCell className="font-medium">{employee.employeeId}</TableCell>
                         <TableCell>
@@ -1625,6 +2717,18 @@ const HRMS = () => {
                     ))}
                   </TableBody>
                 </Table>
+
+                {/* Pagination for Employees */}
+                {filteredEmployees.length > 0 && (
+                  <Pagination
+                    currentPage={employeesPage}
+                    totalPages={Math.ceil(filteredEmployees.length / employeesItemsPerPage)}
+                    totalItems={filteredEmployees.length}
+                    itemsPerPage={employeesItemsPerPage}
+                    onPageChange={setEmployeesPage}
+                    onItemsPerPageChange={setEmployeesItemsPerPage}
+                  />
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1829,7 +2933,7 @@ const HRMS = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {attendance.map((record) => (
+                    {paginatedAttendance.map((record) => (
                       <TableRow key={record.id}>
                         <TableCell className="font-medium">{record.employeeName}</TableCell>
                         <TableCell>{record.date}</TableCell>
@@ -1844,6 +2948,18 @@ const HRMS = () => {
                     ))}
                   </TableBody>
                 </Table>
+
+                {/* Pagination for Attendance */}
+                {attendance.length > 0 && (
+                  <Pagination
+                    currentPage={attendancePage}
+                    totalPages={Math.ceil(attendance.length / attendanceItemsPerPage)}
+                    totalItems={attendance.length}
+                    itemsPerPage={attendanceItemsPerPage}
+                    onPageChange={setAttendancePage}
+                    onItemsPerPageChange={setAttendanceItemsPerPage}
+                  />
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1887,7 +3003,7 @@ const HRMS = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {leaveRequests.map((leave) => (
+                    {paginatedLeaveRequests.map((leave) => (
                       <TableRow key={leave.id}>
                         <TableCell className="font-medium">{leave.employee}</TableCell>
                         <TableCell>
@@ -1927,6 +3043,18 @@ const HRMS = () => {
                     ))}
                   </TableBody>
                 </Table>
+
+                {/* Pagination for Leave Requests */}
+                {leaveRequests.length > 0 && (
+                  <Pagination
+                    currentPage={leaveRequestsPage}
+                    totalPages={Math.ceil(leaveRequests.length / leaveRequestsItemsPerPage)}
+                    totalItems={leaveRequests.length}
+                    itemsPerPage={leaveRequestsItemsPerPage}
+                    onPageChange={setLeaveRequestsPage}
+                    onItemsPerPageChange={setLeaveRequestsItemsPerPage}
+                  />
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -2053,7 +3181,18 @@ const HRMS = () => {
                 Export Payroll
               </Button>
             </div>
-            <PayrollSection />
+            <PayrollSection 
+              employees={employees}
+              payroll={payroll}
+              salaryStructures={salaryStructures}
+              salarySlips={salarySlips}
+              attendance={attendance}
+              selectedMonth={selectedMonth}
+              onProcessPayroll={handleProcessPayroll}
+              onGenerateSalary={handleGenerateSalary}
+              onBulkSalaryGenerate={handleBulkSalaryGenerate}
+              onUpdateSalaryStructure={handleUpdateSalaryStructure}
+            />
           </TabsContent>
 
           {/* Performance Tab */}
@@ -2075,7 +3214,7 @@ const HRMS = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {performance.map((perf) => (
+                    {paginatedPerformance.map((perf) => (
                       <TableRow key={perf.id}>
                         <TableCell className="font-medium">{perf.employeeName}</TableCell>
                         <TableCell>{perf.department}</TableCell>
@@ -2101,6 +3240,18 @@ const HRMS = () => {
                     ))}
                   </TableBody>
                 </Table>
+
+                {/* Pagination for Performance */}
+                {performance.length > 0 && (
+                  <Pagination
+                    currentPage={performancePage}
+                    totalPages={Math.ceil(performance.length / performanceItemsPerPage)}
+                    totalItems={performance.length}
+                    itemsPerPage={performanceItemsPerPage}
+                    onPageChange={setPerformancePage}
+                    onItemsPerPageChange={setPerformanceItemsPerPage}
+                  />
+                )}
               </CardContent>
             </Card>
           </TabsContent>
